@@ -577,195 +577,393 @@ final class Essential_Hardening {
 			return;
 		}
 
-		$options = $this->get_settings();
+		$options      = $this->get_settings();
+		$active_count = count( array_filter( $options ) );
+		$total_count  = count( $this->get_default_settings() );
 		?>
-		<div class="wrap">
-			<h1><?php esc_html_e( 'Essential Hardening & Security', 'essential-hardening' ); ?> <span style="font-size: 13px; font-weight: normal; color: #646970;">v<?php echo esc_html( self::VERSION ); ?></span></h1>
-			<p class="description">
-				<?php esc_html_e( 'Suite ligera y modular de protección para WordPress. Cada módulo puede activarse o desactivarse según las necesidades de cada proyecto sin sobrecarga de base de datos ni dependencias externas.', 'essential-hardening' ); ?>
-			</p>
+		<div class="wrap" id="eh-settings-wrap">
+			<style>
+				#eh-settings-wrap {
+					max-width: 960px;
+					margin-top: 20px;
+				}
+				.eh-banner {
+					background: linear-gradient(135deg, #1d2327 0%, #2c3338 100%);
+					color: #ffffff;
+					padding: 24px 30px;
+					border-radius: 8px 8px 0 0;
+					display: flex;
+					align-items: center;
+					justify-content: space-between;
+					flex-wrap: wrap;
+					gap: 15px;
+					border: 1px solid #1d2327;
+					border-bottom: none;
+				}
+				.eh-banner-title {
+					margin: 0;
+					font-size: 22px;
+					font-weight: 700;
+					color: #ffffff;
+					display: flex;
+					align-items: center;
+					gap: 12px;
+				}
+				.eh-banner-subtitle {
+					margin: 6px 0 0;
+					font-size: 13px;
+					color: #c3c4c7;
+					max-width: 620px;
+					line-height: 1.45;
+				}
+				.eh-version-badge {
+					background: #2271b1;
+					color: #ffffff;
+					font-size: 11px;
+					padding: 3px 8px;
+					border-radius: 12px;
+					font-weight: 600;
+					letter-spacing: 0.5px;
+				}
+				.eh-stats-pill {
+					background: rgba(255, 255, 255, 0.1);
+					border: 1px solid rgba(255, 255, 255, 0.15);
+					padding: 10px 18px;
+					border-radius: 20px;
+					font-size: 13px;
+					font-weight: 500;
+					color: #ffffff;
+					text-align: right;
+				}
+				.eh-stats-pill strong {
+					color: #72aee6;
+					font-size: 15px;
+				}
+				.eh-card {
+					background: #ffffff;
+					border: 1px solid #c3c4c7;
+					border-top: none;
+					padding: 24px 28px;
+				}
+				.eh-card:last-of-type {
+					border-radius: 0 0 8px 8px;
+					border-bottom: 1px solid #c3c4c7;
+				}
+				.eh-card-header {
+					display: flex;
+					align-items: center;
+					gap: 12px;
+					margin-bottom: 16px;
+					padding-bottom: 12px;
+					border-bottom: 2px solid #f0f0f1;
+				}
+				.eh-card-icon {
+					font-size: 22px;
+					line-height: 1;
+				}
+				.eh-card-title {
+					margin: 0;
+					font-size: 16px;
+					font-weight: 600;
+					color: #1d2327;
+				}
+				.eh-card-desc {
+					margin: 2px 0 0;
+					font-size: 12px;
+					color: #646970;
+				}
+				.eh-grid {
+					display: grid;
+					grid-template-columns: 1fr;
+					gap: 12px;
+				}
+				@media (min-width: 782px) {
+					.eh-grid-2col {
+						grid-template-columns: 1fr 1fr;
+					}
+				}
+				.eh-item {
+					display: flex;
+					align-items: flex-start;
+					gap: 14px;
+					background: #f6f7f7;
+					border: 1px solid #dcdcde;
+					border-radius: 6px;
+					padding: 14px 16px;
+					transition: all 0.15s ease-in-out;
+				}
+				.eh-item:hover {
+					background: #f0f6fc;
+					border-color: #72aee6;
+				}
+				.eh-item input[type="checkbox"] {
+					margin-top: 3px;
+					transform: scale(1.15);
+					cursor: pointer;
+				}
+				.eh-item-body {
+					flex: 1;
+				}
+				.eh-item-title-row {
+					display: flex;
+					align-items: center;
+					gap: 8px;
+					flex-wrap: wrap;
+				}
+				.eh-item-label {
+					font-size: 13.5px;
+					font-weight: 600;
+					color: #1d2327;
+					cursor: pointer;
+				}
+				.eh-tag {
+					font-size: 10px;
+					font-weight: 600;
+					padding: 2px 7px;
+					border-radius: 4px;
+					text-transform: uppercase;
+					letter-spacing: 0.3px;
+				}
+				.eh-tag-firewall { background: #e7f5ea; color: #185a25; }
+				.eh-tag-access   { background: #eef2fa; color: #1a4282; }
+				.eh-tag-privacy  { background: #fef4e8; color: #8a4b08; }
+				.eh-tag-spam     { background: #fbeae5; color: #8a2414; }
+				.eh-item-desc {
+					margin: 5px 0 0;
+					font-size: 12px;
+					color: #50575e;
+					line-height: 1.45;
+				}
+				.eh-submit-bar {
+					margin-top: 20px;
+					display: flex;
+					align-items: center;
+					justify-content: space-between;
+				}
+			</style>
 
-			<form method="post" action="options.php" style="margin-top: 25px; max-width: 860px;">
-				<?php
-				settings_fields( 'essential_hardening_group' );
-				?>
+			<form method="post" action="options.php">
+				<?php settings_fields( 'essential_hardening_group' ); ?>
 
-				<div style="background: #ffffff; border: 1px solid #ccd0d4; border-radius: 8px; padding: 24px; box-shadow: 0 1px 3px rgba(0,0,0,0.04);">
-					<h2 style="margin-top:0; border-bottom:1px solid #f0f0f1; padding-bottom:12px;">
-						<?php esc_html_e( 'Escudos Activos', 'essential-hardening' ); ?>
-					</h2>
+				<!-- Banner Principal -->
+				<div class="eh-banner">
+					<div>
+						<h1 class="eh-banner-title">
+							<span>🛡️ Essential Hardening & Security</span>
+							<span class="eh-version-badge">v<?php echo esc_html( self::VERSION ); ?></span>
+						</h1>
+						<p class="eh-banner-subtitle">
+							<?php esc_html_e( 'Suite modular de protección perimetral, control de accesos y endurecimiento de WordPress. Ajuste cada escudo individualmente según las características de su servidor o plugins complementarios.', 'essential-hardening' ); ?>
+						</p>
+					</div>
+					<div class="eh-stats-pill">
+						<span><?php esc_html_e( 'Estado General:', 'essential-hardening' ); ?></span><br>
+						<strong><?php echo esc_html( (string) $active_count ); ?></strong> / <?php echo esc_html( (string) $total_count ); ?> <?php esc_html_e( 'escudos activos', 'essential-hardening' ); ?>
+					</div>
+				</div>
 
-					<table class="form-table" role="presentation">
-						<!-- 1. Comentarios -->
-						<tr>
-							<th scope="row"><?php esc_html_e( 'Comentarios & Spam', 'essential-hardening' ); ?></th>
-							<td>
-								<label>
-									<input type="checkbox" name="<?php echo esc_attr( self::OPTION_NAME ); ?>[disable_comments]" value="1" <?php checked( $options['disable_comments'] ); ?>>
-									<strong><?php esc_html_e( 'Desactivar comentarios y trackbacks al 100%', 'essential-hardening' ); ?></strong>
-								</label>
-								<p class="description">
-									<?php esc_html_e( 'Cierra comentarios en front-end, elimina el endpoint wp-comments-post.php (HTTP 403), retira feeds de comentarios y oculta menús en el panel.', 'essential-hardening' ); ?>
-								</p>
-							</td>
-						</tr>
+				<!-- CATEGORÍA 1: Cortafuegos & Perímetro -->
+				<div class="eh-card">
+					<div class="eh-card-header">
+						<span class="eh-card-icon">🧱</span>
+						<div>
+							<h2 class="eh-card-title"><?php esc_html_e( '1. Cortafuegos y Blindaje de Archivos', 'essential-hardening' ); ?></h2>
+							<p class="eh-card-desc"><?php esc_html_e( 'Filtra peticiones en tiempo real y sella directorios vulnerables a nivel de servidor.', 'essential-hardening' ); ?></p>
+						</div>
+					</div>
 
-						<!-- 2. Micro-WAF -->
-						<tr>
-							<th scope="row"><?php esc_html_e( 'Micro-WAF', 'essential-hardening' ); ?></th>
-							<td>
-								<label>
-									<input type="checkbox" name="<?php echo esc_attr( self::OPTION_NAME ); ?>[query_firewall]" value="1" <?php checked( $options['query_firewall'] ); ?>>
-									<strong><?php esc_html_e( 'Cortafuegos de Query Strings y peticiones maliciosas', 'essential-hardening' ); ?></strong>
-								</label>
-								<p class="description">
-									<?php esc_html_e( 'Inspecciona cadenas de consulta URL y bloquea de inmediato (HTTP 403) patrones de inyección SQL, comandos remotos (eval, base64_decode), LFI (/etc/passwd, wp-config.php) y path traversal.', 'essential-hardening' ); ?>
-								</p>
-							</td>
-						</tr>
+					<div class="eh-grid eh-grid-2col">
+						<!-- Micro-WAF -->
+						<div class="eh-item">
+							<input type="checkbox" id="eh_query_firewall" name="<?php echo esc_attr( self::OPTION_NAME ); ?>[query_firewall]" value="1" <?php checked( $options['query_firewall'] ); ?>>
+							<div class="eh-item-body">
+								<div class="eh-item-title-row">
+									<label for="eh_query_firewall" class="eh-item-label"><?php esc_html_e( 'Micro-WAF (Cortafuegos URL)', 'essential-hardening' ); ?></label>
+									<span class="eh-tag eh-tag-firewall"><?php esc_html_e( 'Firewall', 'essential-hardening' ); ?></span>
+								</div>
+								<p class="eh-item-desc"><?php esc_html_e( 'Bloquea peticiones maliciosas (HTTP 403): inyecciones SQL (UNION SELECT), funciones RCE (eval, base64_decode), LFI (wp-config.php) y path traversal.', 'essential-hardening' ); ?></p>
+							</div>
+						</div>
 
-						<!-- 3. Fuerza Bruta / Login Throttle -->
-						<tr>
-							<th scope="row"><?php esc_html_e( 'Fuerza Bruta (Login)', 'essential-hardening' ); ?></th>
-							<td>
-								<label>
-									<input type="checkbox" name="<?php echo esc_attr( self::OPTION_NAME ); ?>[login_throttle]" value="1" <?php checked( $options['login_throttle'] ); ?>>
-									<strong><?php esc_html_e( 'Mitigación de fuerza bruta y rate-limiting en wp-login', 'essential-hardening' ); ?></strong>
-								</label>
-								<p class="description">
-									<?php esc_html_e( 'Añade retardo de 2s tras un fallo y bloquea la IP infractora por 15 minutos tras 5 intentos fallidos consecutivos usando transients nativos en memoria.', 'essential-hardening' ); ?>
-								</p>
-							</td>
-						</tr>
+						<!-- Protección de Uploads -->
+						<div class="eh-item">
+							<input type="checkbox" id="eh_protect_uploads" name="<?php echo esc_attr( self::OPTION_NAME ); ?>[protect_uploads]" value="1" <?php checked( $options['protect_uploads'] ); ?>>
+							<div class="eh-item-body">
+								<div class="eh-item-title-row">
+									<label for="eh_protect_uploads" class="eh-item-label"><?php esc_html_e( 'Protección de Uploads', 'essential-hardening' ); ?></label>
+									<span class="eh-tag eh-tag-firewall"><?php esc_html_e( 'Servidor', 'essential-hardening' ); ?></span>
+								</div>
+								<p class="eh-item-desc"><?php esc_html_e( 'Escribe reglas en .htaccess de uploads para impedir la ejecución directa de cualquier script PHP subido por plugins vulnerables.', 'essential-hardening' ); ?></p>
+							</div>
+						</div>
 
-						<!-- 4. Protección de Uploads -->
-						<tr>
-							<th scope="row"><?php esc_html_e( 'Protección de Uploads', 'essential-hardening' ); ?></th>
-							<td>
-								<label>
-									<input type="checkbox" name="<?php echo esc_attr( self::OPTION_NAME ); ?>[protect_uploads]" value="1" <?php checked( $options['protect_uploads'] ); ?>>
-									<strong><?php esc_html_e( 'Bloquear ejecución de PHP en wp-content/uploads', 'essential-hardening' ); ?></strong>
-								</label>
-								<p class="description">
-									<?php esc_html_e( 'Inserta reglas defensivas en wp-content/uploads/.htaccess para impedir que un atacante ejecute scripts PHP subidos mediante vulnerabilidades de otros plugins.', 'essential-hardening' ); ?>
-								</p>
-							</td>
-						</tr>
+						<!-- Cabeceras HTTP -->
+						<div class="eh-item">
+							<input type="checkbox" id="eh_security_headers" name="<?php echo esc_attr( self::OPTION_NAME ); ?>[security_headers]" value="1" <?php checked( $options['security_headers'] ); ?>>
+							<div class="eh-item-body">
+								<div class="eh-item-title-row">
+									<label for="eh_security_headers" class="eh-item-label"><?php esc_html_e( 'Cabeceras HTTP Defensivas', 'essential-hardening' ); ?></label>
+									<span class="eh-tag eh-tag-firewall"><?php esc_html_e( 'Headers', 'essential-hardening' ); ?></span>
+								</div>
+								<p class="eh-item-desc"><?php esc_html_e( 'Inyecta X-Frame-Options (anti-clickjacking), X-Content-Type-Options: nosniff, Referrer-Policy y Permissions-Policy en cada respuesta HTTP.', 'essential-hardening' ); ?></p>
+							</div>
+						</div>
 
-						<!-- 5. Anti-Enumeración -->
-						<tr>
-							<th scope="row"><?php esc_html_e( 'Anti-Enumeración', 'essential-hardening' ); ?></th>
-							<td>
-								<label>
-									<input type="checkbox" name="<?php echo esc_attr( self::OPTION_NAME ); ?>[block_user_enumeration]" value="1" <?php checked( $options['block_user_enumeration'] ); ?>>
-									<strong><?php esc_html_e( 'Bloquear escaneos de nombres de usuario (?author=N y REST API)', 'essential-hardening' ); ?></strong>
-								</label>
-								<p class="description">
-									<?php esc_html_e( 'Redirige consultas ?author=N y oculta el endpoint REST API /wp/v2/users a visitantes anónimos, evitando ataques dirigidos de fuerza bruta.', 'essential-hardening' ); ?>
-								</p>
-							</td>
-						</tr>
+						<!-- Desactivar XML-RPC -->
+						<div class="eh-item">
+							<input type="checkbox" id="eh_disable_xmlrpc" name="<?php echo esc_attr( self::OPTION_NAME ); ?>[disable_xmlrpc]" value="1" <?php checked( $options['disable_xmlrpc'] ); ?>>
+							<div class="eh-item-body">
+								<div class="eh-item-title-row">
+									<label for="eh_disable_xmlrpc" class="eh-item-label"><?php esc_html_e( 'Desactivar XML-RPC', 'essential-hardening' ); ?></label>
+									<span class="eh-tag eh-tag-firewall"><?php esc_html_e( 'Protocolo', 'essential-hardening' ); ?></span>
+								</div>
+								<p class="eh-item-desc"><?php esc_html_e( 'Cierra la interfaz xmlrpc.php, neutralizando ataques históricos de fuerza bruta multicredencial y amplificación de ataques DDoS.', 'essential-hardening' ); ?></p>
+							</div>
+						</div>
+					</div>
+				</div>
 
-						<!-- 6. Ocultar Autor en body_class -->
-						<tr>
-							<th scope="row"><?php esc_html_e( 'Anonimización de Body', 'essential-hardening' ); ?></th>
-							<td>
-								<label>
-									<input type="checkbox" name="<?php echo esc_attr( self::OPTION_NAME ); ?>[hide_author_body_class]" value="1" <?php checked( $options['hide_author_body_class'] ); ?>>
-									<strong><?php esc_html_e( 'Ocultar nombres de usuario en las clases de body (body_class)', 'essential-hardening' ); ?></strong>
-								</label>
-								<p class="description">
-									<?php esc_html_e( 'Filtra y elimina clases como "author-admin" o "author-username" del HTML de las páginas para que bots de scraping no recolecten usuarios del código fuente.', 'essential-hardening' ); ?>
-								</p>
-							</td>
-						</tr>
+				<!-- CATEGORÍA 2: Acceso & Fuerza Bruta -->
+				<div class="eh-card">
+					<div class="eh-card-header">
+						<span class="eh-card-icon">🔑</span>
+						<div>
+							<h2 class="eh-card-title"><?php esc_html_e( '2. Acceso y Control de Fuerza Bruta', 'essential-hardening' ); ?></h2>
+							<p class="eh-card-desc"><?php esc_html_e( 'Amortigua y bloquea intentos automatizados de intrusión en el formulario de inicio de sesión.', 'essential-hardening' ); ?></p>
+						</div>
+					</div>
 
-						<!-- 7. Cabeceras HTTP -->
-						<tr>
-							<th scope="row"><?php esc_html_e( 'Cabeceras HTTP', 'essential-hardening' ); ?></th>
-							<td>
-								<label>
-									<input type="checkbox" name="<?php echo esc_attr( self::OPTION_NAME ); ?>[security_headers]" value="1" <?php checked( $options['security_headers'] ); ?>>
-									<strong><?php esc_html_e( 'Inyectar cabeceras HTTP de seguridad', 'essential-hardening' ); ?></strong>
-								</label>
-								<p class="description">
-									<?php esc_html_e( 'Añade X-Frame-Options (anti-clickjacking), X-Content-Type-Options: nosniff, Referrer-Policy y Permissions-Policy.', 'essential-hardening' ); ?>
-								</p>
-							</td>
-						</tr>
+					<div class="eh-grid eh-grid-2col">
+						<!-- Login Throttle -->
+						<div class="eh-item">
+							<input type="checkbox" id="eh_login_throttle" name="<?php echo esc_attr( self::OPTION_NAME ); ?>[login_throttle]" value="1" <?php checked( $options['login_throttle'] ); ?>>
+							<div class="eh-item-body">
+								<div class="eh-item-title-row">
+									<label for="eh_login_throttle" class="eh-item-label"><?php esc_html_e( 'Rate-Limiting de Login (Throttle)', 'essential-hardening' ); ?></label>
+									<span class="eh-tag eh-tag-access"><?php esc_html_e( 'Fuerza Bruta', 'essential-hardening' ); ?></span>
+								</div>
+								<p class="eh-item-desc"><?php esc_html_e( 'Añade 2s de retardo tras cada fallo y bloquea la IP por 15 minutos al acumular 5 fallos consecutivos usando transients en memoria.', 'essential-hardening' ); ?></p>
+							</div>
+						</div>
 
-						<!-- 8. Huellas de WordPress -->
-						<tr>
-							<th scope="row"><?php esc_html_e( 'Huellas de WordPress', 'essential-hardening' ); ?></th>
-							<td>
-								<label>
-									<input type="checkbox" name="<?php echo esc_attr( self::OPTION_NAME ); ?>[hide_wp_version]" value="1" <?php checked( $options['hide_wp_version'] ); ?>>
-									<strong><?php esc_html_e( 'Ocultar versión de WordPress en head y recursos (?ver=)', 'essential-hardening' ); ?></strong>
-								</label>
-								<p class="description">
-									<?php esc_html_e( 'Elimina la etiqueta generator y suprime el parámetro ?ver= de estilos y scripts para dificultar el perfilado automatizado por bots.', 'essential-hardening' ); ?>
-								</p>
-							</td>
-						</tr>
+						<!-- Login Errors Genéricos -->
+						<div class="eh-item">
+							<input type="checkbox" id="eh_generic_login_errors" name="<?php echo esc_attr( self::OPTION_NAME ); ?>[generic_login_errors]" value="1" <?php checked( $options['generic_login_errors'] ); ?>>
+							<div class="eh-item-body">
+								<div class="eh-item-title-row">
+									<label for="eh_generic_login_errors" class="eh-item-label"><?php esc_html_e( 'Errores de Login Genéricos', 'essential-hardening' ); ?></label>
+									<span class="eh-tag eh-tag-access"><?php esc_html_e( 'Ofuscación', 'essential-hardening' ); ?></span>
+								</div>
+								<p class="eh-item-desc"><?php esc_html_e( 'Muestra siempre "Usuario o contraseña incorrectos", impidiendo saber si el nombre de usuario existe en la base de datos.', 'essential-hardening' ); ?></p>
+							</div>
+						</div>
 
-						<!-- 9. Limpieza de Head -->
-						<tr>
-							<th scope="row"><?php esc_html_e( 'Limpieza de Head', 'essential-hardening' ); ?></th>
-							<td>
-								<label>
-									<input type="checkbox" name="<?php echo esc_attr( self::OPTION_NAME ); ?>[clean_head_meta]" value="1" <?php checked( $options['clean_head_meta'] ); ?>>
-									<strong><?php esc_html_e( 'Eliminar metadatos y enlaces obsoletos en <head>', 'essential-hardening' ); ?></strong>
-								</label>
-								<p class="description">
-									<?php esc_html_e( 'Remueve enlaces a Really Simple Discovery (RSD), Windows Live Writer (wlwmanifest), shortlinks redundantes y enlaces REST API públicos en cabecera.', 'essential-hardening' ); ?>
-								</p>
-							</td>
-						</tr>
+						<!-- Bloquear Edición de Archivos -->
+						<div class="eh-item">
+							<input type="checkbox" id="eh_disallow_file_edit" name="<?php echo esc_attr( self::OPTION_NAME ); ?>[disallow_file_edit]" value="1" <?php checked( $options['disallow_file_edit'] ); ?>>
+							<div class="eh-item-body">
+								<div class="eh-item-title-row">
+									<label for="eh_disallow_file_edit" class="eh-item-label"><?php esc_html_e( 'Bloquear Editor PHP en Panel', 'essential-hardening' ); ?></label>
+									<span class="eh-tag eh-tag-access"><?php esc_html_e( 'Integridad', 'essential-hardening' ); ?></span>
+								</div>
+								<p class="eh-item-desc"><?php esc_html_e( 'Define DISALLOW_FILE_EDIT para deshabilitar el editor web de temas y plugins, impidiendo la inyección de webshells si una sesión se compromete.', 'essential-hardening' ); ?></p>
+							</div>
+						</div>
+					</div>
+				</div>
 
-						<!-- 10. XML-RPC -->
-						<tr>
-							<th scope="row"><?php esc_html_e( 'XML-RPC', 'essential-hardening' ); ?></th>
-							<td>
-								<label>
-									<input type="checkbox" name="<?php echo esc_attr( self::OPTION_NAME ); ?>[disable_xmlrpc]" value="1" <?php checked( $options['disable_xmlrpc'] ); ?>>
-									<strong><?php esc_html_e( 'Deshabilitar interfaz XML-RPC', 'essential-hardening' ); ?></strong>
-								</label>
-								<p class="description">
-									<?php esc_html_e( 'Cierra un vector histórico habitual de ataques de fuerza bruta y amplificación DDoS.', 'essential-hardening' ); ?>
-								</p>
-							</td>
-						</tr>
+				<!-- CATEGORÍA 3: Anti-Reconocimiento & Privacidad -->
+				<div class="eh-card">
+					<div class="eh-card-header">
+						<span class="eh-card-icon">🕵️</span>
+						<div>
+							<h2 class="eh-card-title"><?php esc_html_e( '3. Reconocimiento y Privacidad (Anti-Recon)', 'essential-hardening' ); ?></h2>
+							<p class="eh-card-desc"><?php esc_html_e( 'Evita la extracción automatizada de nombres de usuario y oculta las huellas estructurales del CMS.', 'essential-hardening' ); ?></p>
+						</div>
+					</div>
 
-						<!-- 11. Login Seguro -->
-						<tr>
-							<th scope="row"><?php esc_html_e( 'Login Seguro', 'essential-hardening' ); ?></th>
-							<td>
-								<label>
-									<input type="checkbox" name="<?php echo esc_attr( self::OPTION_NAME ); ?>[generic_login_errors]" value="1" <?php checked( $options['generic_login_errors'] ); ?>>
-									<strong><?php esc_html_e( 'Mensajes de error de inicio de sesión genéricos', 'essential-hardening' ); ?></strong>
-								</label>
-								<p class="description">
-									<?php esc_html_e( 'No revela si lo que falló fue el nombre de usuario o la contraseña.', 'essential-hardening' ); ?>
-								</p>
-							</td>
-						</tr>
+					<div class="eh-grid eh-grid-2col">
+						<!-- Anti-Enumeración de Usuarios -->
+						<div class="eh-item">
+							<input type="checkbox" id="eh_block_user_enumeration" name="<?php echo esc_attr( self::OPTION_NAME ); ?>[block_user_enumeration]" value="1" <?php checked( $options['block_user_enumeration'] ); ?>>
+							<div class="eh-item-body">
+								<div class="eh-item-title-row">
+									<label for="eh_block_user_enumeration" class="eh-item-label"><?php esc_html_e( 'Bloquear Enumeración de Usuarios', 'essential-hardening' ); ?></label>
+									<span class="eh-tag eh-tag-privacy"><?php esc_html_e( 'Anti-Sondeo', 'essential-hardening' ); ?></span>
+								</div>
+								<p class="eh-item-desc"><?php esc_html_e( 'Redirige consultas ?author=N (HTTP 301) y oculta el endpoint /wp/v2/users en la REST API pública para que escáneres no extraigan las cuentas.', 'essential-hardening' ); ?></p>
+							</div>
+						</div>
 
-						<!-- 12. Integridad de Código -->
-						<tr>
-							<th scope="row"><?php esc_html_e( 'Integridad de Código', 'essential-hardening' ); ?></th>
-							<td>
-								<label>
-									<input type="checkbox" name="<?php echo esc_attr( self::OPTION_NAME ); ?>[disallow_file_edit]" value="1" <?php checked( $options['disallow_file_edit'] ); ?>>
-									<strong><?php esc_html_e( 'Bloquear edición de archivos PHP en el panel', 'essential-hardening' ); ?></strong>
-								</label>
-								<p class="description">
-									<?php esc_html_e( 'Define DISALLOW_FILE_EDIT para evitar inyecciones de código si una sesión administrativa llega a verse comprometida.', 'essential-hardening' ); ?>
-								</p>
-							</td>
-						</tr>
-					</table>
+						<!-- Ocultar Usuario en body_class -->
+						<div class="eh-item">
+							<input type="checkbox" id="eh_hide_author_body_class" name="<?php echo esc_attr( self::OPTION_NAME ); ?>[hide_author_body_class]" value="1" <?php checked( $options['hide_author_body_class'] ); ?>>
+							<div class="eh-item-body">
+								<div class="eh-item-title-row">
+									<label for="eh_hide_author_body_class" class="eh-item-label"><?php esc_html_e( 'Anonimizar Usuarios en body_class', 'essential-hardening' ); ?></label>
+									<span class="eh-tag eh-tag-privacy"><?php esc_html_e( 'HTML Seguro', 'essential-hardening' ); ?></span>
+								</div>
+								<p class="eh-item-desc"><?php esc_html_e( 'Elimina clases como "author-admin" o "author-login" del tag <body> en páginas y entradas públicas para evitar raspado de usuarios en el código fuente.', 'essential-hardening' ); ?></p>
+							</div>
+						</div>
 
-					<?php submit_button( __( 'Guardar Cambios de Seguridad', 'essential-hardening' ) ); ?>
+						<!-- Ocultar Versión de WP -->
+						<div class="eh-item">
+							<input type="checkbox" id="eh_hide_wp_version" name="<?php echo esc_attr( self::OPTION_NAME ); ?>[hide_wp_version]" value="1" <?php checked( $options['hide_wp_version'] ); ?>>
+							<div class="eh-item-body">
+								<div class="eh-item-title-row">
+									<label for="eh_hide_wp_version" class="eh-item-label"><?php esc_html_e( 'Ocultar Versión de WordPress', 'essential-hardening' ); ?></label>
+									<span class="eh-tag eh-tag-privacy"><?php esc_html_e( 'Huellas CMS', 'essential-hardening' ); ?></span>
+								</div>
+								<p class="eh-item-desc"><?php esc_html_e( 'Retira la etiqueta generator y elimina el parámetro ?ver= de estilos y scripts públicos para complicar el perfilado por versiones vulnerables.', 'essential-hardening' ); ?></p>
+							</div>
+						</div>
+
+						<!-- Limpieza de Metadatos en Head -->
+						<div class="eh-item">
+							<input type="checkbox" id="eh_clean_head_meta" name="<?php echo esc_attr( self::OPTION_NAME ); ?>[clean_head_meta]" value="1" <?php checked( $options['clean_head_meta'] ); ?>>
+							<div class="eh-item-body">
+								<div class="eh-item-title-row">
+									<label for="eh_clean_head_meta" class="eh-item-label"><?php esc_html_e( 'Limpieza de Metadatos en <head>', 'essential-hardening' ); ?></label>
+									<span class="eh-tag eh-tag-privacy"><?php esc_html_e( 'Optimización', 'essential-hardening' ); ?></span>
+								</div>
+								<p class="eh-item-desc"><?php esc_html_e( 'Remueve enlaces obsoletos del encabezado: Really Simple Discovery (RSD), Windows Live Writer (WLW), shortlinks y enlaces REST API públicos.', 'essential-hardening' ); ?></p>
+							</div>
+						</div>
+					</div>
+				</div>
+
+				<!-- CATEGORÍA 4: Comentarios & Superficie de Spam -->
+				<div class="eh-card">
+					<div class="eh-card-header">
+						<span class="eh-card-icon">💬</span>
+						<div>
+							<h2 class="eh-card-title"><?php esc_html_e( '4. Comentarios y Superficie de Spam', 'essential-hardening' ); ?></h2>
+							<p class="eh-card-desc"><?php esc_html_e( 'Cierra la principal fuente de enlaces maliciosos y bots de spam en sitios corporativos o institucionales.', 'essential-hardening' ); ?></p>
+						</div>
+					</div>
+
+					<div class="eh-grid">
+						<!-- Desactivar Comentarios Totalmente -->
+						<div class="eh-item">
+							<input type="checkbox" id="eh_disable_comments" name="<?php echo esc_attr( self::OPTION_NAME ); ?>[disable_comments]" value="1" <?php checked( $options['disable_comments'] ); ?>>
+							<div class="eh-item-body">
+								<div class="eh-item-title-row">
+									<label for="eh_disable_comments" class="eh-item-label"><?php esc_html_e( 'Desactivar Comentarios y Trackbacks al 100%', 'essential-hardening' ); ?></label>
+									<span class="eh-tag eh-tag-spam"><?php esc_html_e( 'Anti-Spam Total', 'essential-hardening' ); ?></span>
+								</div>
+								<p class="eh-item-desc"><?php esc_html_e( 'Cierra comentarios en front-end, bloquea llamadas directas a wp-comments-post.php con HTTP 403 Forbidden, suprime endpoints de la REST API (/wp/v2/comments), cancela feeds y limpia menús del panel.', 'essential-hardening' ); ?></p>
+							</div>
+						</div>
+					</div>
+				</div>
+
+				<!-- Barra Inferior de Guardado -->
+				<div class="eh-submit-bar">
+					<?php submit_button( __( 'Guardar Configuración de Seguridad', 'essential-hardening' ), 'primary large', 'submit', false ); ?>
+					<span style="font-size: 12px; color: #646970;">
+						<?php esc_html_e( 'Los cambios se aplican de forma inmediata en memoria.', 'essential-hardening' ); ?>
+					</span>
 				</div>
 			</form>
 		</div>
