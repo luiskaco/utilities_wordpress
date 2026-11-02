@@ -1,0 +1,15 @@
+# OS metadata
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Editors
+.idea/
+.vscode/
+*.sublime-*
+
+# Logs and archives
+*.log
+*.zip
+*.tar.gz
+*.wpress

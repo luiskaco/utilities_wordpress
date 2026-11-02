@@ -9,6 +9,7 @@ Repositorio central de micro-plugins, utilidades y herramientas modulares para W
 | Plugin | Categoría | Versión | Estado | Descripción |
 |---|---|---|---|---|
 | [**Essential Hardening & Security**](./plugins/essential-hardening/) | Seguridad & Hardening | `1.0.0` | `Producción` | Suite de 7 escudos: desactiva comentarios (403 directo), anti-enumeración de usuarios, cabeceras HTTP de seguridad, ofuscación de versiones y bloqueo de editor PHP. |
+| [**Modern WP Migrator**](./plugins/modern-wp-migrator/) | Migración & Backups | `7.113.0` | `Producción` | Motor de migración sin restricciones: límite de subida desbloqueado a 500 GB, restauración en 1 clic directa, sin telemetría ni publicidad, compatible con PHP 8.3+. |
 
 ---
 
@@ -36,10 +37,11 @@ Repositorio central de micro-plugins, utilidades y herramientas modulares para W
 ## 📚 Documentación Técnica
 
 - [Guía técnica de Essential Hardening & Security](./docs/essential-hardening.md)
+- [Guía técnica de Modern WP Migrator](./docs/modern-wp-migrator.md)
 - [Guía para agregar y desarrollar nuevos plugins](./docs/DEVELOPMENT.md)
 
 ---
 
 ## 📄 Licencia
 
-Todos los plugins de este repositorio se distribuyen bajo la licencia **GPL-2.0-or-later**.
+Todos los plugins de este repositorio se distribuyen bajo licencias de código abierto compatibles con WordPress (**GPL-2.0-or-later** / **GPL-3.0-or-later**).
