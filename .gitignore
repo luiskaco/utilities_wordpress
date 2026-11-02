@@ -19,6 +19,9 @@
 Thumbs.db
 *.log
 *.tmp
+*.wpress
+*.tar.gz
+*.zip
 .idea/
 .vscode/
 node_modules/

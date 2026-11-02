@@ -8,7 +8,7 @@ Repositorio central de micro-plugins, utilidades y herramientas modulares para W
 
 | Plugin | Categoría | Versión | Estado | Descripción |
 |---|---|---|---|---|
-| [**Essential Hardening & Security**](./plugins/essential-hardening/) | Seguridad & Hardening | `1.0.0` | `Producción` | Suite de 7 escudos: desactiva comentarios (403 directo), anti-enumeración de usuarios, cabeceras HTTP de seguridad, ofuscación de versiones y bloqueo de editor PHP. |
+| [**Essential Hardening & Security**](./plugins/essential-hardening/) | Seguridad & Hardening | `1.1.0` | `Producción` | Suite de 12 escudos: Micro-WAF, mitigación de fuerza bruta (rate limit), protección de uploads, desactiva comentarios (403 directo), anti-enumeración, cabeceras HTTP y anonimización de huellas. |
 | [**Modern WP Migrator**](./plugins/modern-wp-migrator/) | Migración & Backups | `7.113.0` | `Producción` | Motor de migración sin restricciones: límite de subida desbloqueado a 500 GB, restauración en 1 clic directa, sin telemetría ni publicidad, compatible con PHP 8.3+. |
 
 ---
