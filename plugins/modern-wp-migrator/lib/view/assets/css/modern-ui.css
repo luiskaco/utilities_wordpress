@@ -5,7 +5,14 @@
  */
 
 /* ==========================================================================
-   1. Contenedor y Layout General
+   1. Clases de Visibilidad y Reset
+   ========================================================================== */
+.ai1wm-hide {
+	display: none !important;
+}
+
+/* ==========================================================================
+   2. Contenedor y Layout General
    ========================================================================== */
 .ai1wm-container {
 	max-width: 1200px;
@@ -41,7 +48,7 @@
 }
 
 /* ==========================================================================
-   2. Header Superior y Navegación por Pestañas
+   3. Header Superior y Navegación por Pestañas
    ========================================================================== */
 .mwm-header-wrap {
 	margin-bottom: 24px;
@@ -210,7 +217,7 @@
 }
 
 /* ==========================================================================
-   3. Tarjeta Principal y Cabecera de Sección
+   4. Tarjeta Principal y Cabecera de Sección
    ========================================================================== */
 .ai1wm-holder {
 	background: #ffffff;
@@ -251,7 +258,7 @@
 }
 
 /* ==========================================================================
-   4. Zona de Drag & Drop (Import)
+   5. Zona de Drag & Drop (Import)
    ========================================================================== */
 .mwm-dropzone {
 	background: linear-gradient(180deg, #fbfbfb 0%, #f6f7f7 100%) !important;
@@ -331,7 +338,7 @@
 }
 
 /* ==========================================================================
-   5. Dropdowns de Exportación e Importación
+   6. Dropdowns de Exportación e Importación
    ========================================================================== */
 .ai1wm-button-group {
 	border: 2px solid #2271b1 !important;
@@ -363,7 +370,6 @@
 	background: #ffffff !important;
 }
 
-/* Corregir el enorme espacio vacío de 456px hardcodeado en la versión original */
 .ai1wm-button-group.ai1wm-button-export.ai1wm-open > .ai1wm-dropdown-menu,
 .ai1wm-button-group.ai1wm-button-import.ai1wm-open > .ai1wm-dropdown-menu {
 	height: auto !important;
@@ -392,7 +398,225 @@
 }
 
 /* ==========================================================================
-   6. Barra Lateral de Diagnóstico (Sidebar)
+   7. Tabla de Copias de Seguridad (Backups)
+   ========================================================================== */
+.ai1wm-backups {
+	width: 100% !important;
+	border-collapse: separate !important;
+	border-spacing: 0 !important;
+	border: 1px solid #c3c4c7 !important;
+	border-radius: 8px !important;
+	overflow: hidden !important;
+	margin: 18px 0 24px 0 !important;
+	background: #ffffff !important;
+}
+
+.ai1wm-backups thead th {
+	background: #f6f7f7 !important;
+	color: #1d2327 !important;
+	font-size: 13px !important;
+	font-weight: 600 !important;
+	padding: 12px 16px !important;
+	border-bottom: 1px solid #c3c4c7 !important;
+	border-top: none !important;
+}
+
+.ai1wm-backups tbody tr {
+	transition: background 0.15s ease-in-out;
+	border-bottom: 1px solid #f0f0f1 !important;
+}
+
+.ai1wm-backups tbody tr:last-child {
+	border-bottom: none !important;
+}
+
+.ai1wm-backups tbody tr:hover {
+	background: #f0f6fc !important;
+}
+
+.ai1wm-backups tbody td {
+	padding: 14px 16px !important;
+	font-size: 13px !important;
+	color: #3c434a !important;
+	vertical-align: middle !important;
+}
+
+.ai1wm-backups .ai1wm-column-checkbox {
+	width: 36px !important;
+	text-align: center !important;
+}
+
+.ai1wm-backups .ai1wm-column-checkbox input[type="checkbox"] {
+	margin: 0 !important;
+	vertical-align: middle !important;
+}
+
+.ai1wm-backups .ai1wm-column-name {
+	text-align: left !important;
+	font-weight: 600;
+	color: #1d2327;
+}
+
+.ai1wm-backups .ai1wm-column-name i.ai1wm-icon-file-zip {
+	color: #2271b1;
+	margin-right: 6px;
+	font-size: 16px;
+}
+
+.ai1wm-backups .ai1wm-column-date {
+	text-align: left !important;
+	width: 180px !important;
+	color: #646970;
+	font-size: 12.5px;
+}
+
+.ai1wm-backups .ai1wm-column-size {
+	text-align: right !important;
+	width: 120px !important;
+	font-weight: 600;
+	color: #1d2327;
+	font-size: 12.5px;
+}
+
+.ai1wm-backups .ai1wm-column-actions {
+	text-align: right !important;
+	width: 80px !important;
+}
+
+.ai1wm-backup-actions > div {
+	position: relative;
+	display: flex;
+	justify-content: flex-end;
+}
+
+.ai1wm-backups tbody td.ai1wm-backup-actions > div .ai1wm-backup-dots {
+	border-radius: 6px !important;
+	padding: 6px 10px !important;
+	color: #646970 !important;
+	font-size: 16px !important;
+	text-decoration: none !important;
+	display: inline-flex !important;
+	align-items: center !important;
+	justify-content: center !important;
+	border: 1px solid #dcdcde !important;
+	background: #ffffff !important;
+	cursor: pointer;
+	transition: all 0.15s ease !important;
+}
+
+.ai1wm-backups tbody td.ai1wm-backup-actions > div .ai1wm-backup-dots:hover {
+	background: #f0f0f1 !important;
+	color: #1d2327 !important;
+	border-color: #8c8f94 !important;
+}
+
+.ai1wm-backup-actions > div .ai1wm-backup-dots-menu {
+	position: absolute !important;
+	right: 0 !important;
+	top: 100% !important;
+	margin-top: 4px !important;
+	background: #ffffff !important;
+	border: 1px solid #c3c4c7 !important;
+	border-radius: 6px !important;
+	box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12) !important;
+	padding: 4px 0 !important;
+	min-width: 150px !important;
+	z-index: 100 !important;
+}
+
+.ai1wm-backup-actions > div .ai1wm-backup-dots-menu > ul {
+	margin: 0 !important;
+	padding: 0 !important;
+	list-style: none !important;
+}
+
+.ai1wm-backup-actions > div .ai1wm-backup-dots-menu > ul > li {
+	margin: 0 !important;
+	padding: 0 !important;
+}
+
+.ai1wm-backup-actions > div .ai1wm-backup-dots-menu > ul > li.divider {
+	border-top: 1px solid #f0f0f1 !important;
+	margin: 4px 0 !important;
+}
+
+.ai1wm-backup-actions > div .ai1wm-backup-dots-menu > ul > li > a {
+	padding: 8px 16px !important;
+	font-size: 13px !important;
+	font-weight: 500 !important;
+	color: #1d2327 !important;
+	display: flex !important;
+	align-items: center !important;
+	gap: 8px !important;
+	text-decoration: none !important;
+	transition: background 0.15s ease !important;
+}
+
+.ai1wm-backup-actions > div .ai1wm-backup-dots-menu > ul > li > a:hover {
+	background: #f0f6fc !important;
+	color: #2271b1 !important;
+}
+
+.ai1wm-backup-actions > div .ai1wm-backup-dots-menu > ul > li > a.ai1wm-backup-delete {
+	color: #d63638 !important;
+}
+
+.ai1wm-backup-actions > div .ai1wm-backup-dots-menu > ul > li > a.ai1wm-backup-delete:hover {
+	background: #fbeae5 !important;
+}
+
+.ai1wm-backups .ai1wm-backup-label-description {
+	font-size: 12px !important;
+	color: #8c8f94 !important;
+	text-decoration: underline !important;
+	cursor: pointer !important;
+	margin-top: 3px !important;
+	display: inline-block !important;
+}
+
+.ai1wm-backups .ai1wm-backup-label-text .ai1wm-backup-label-colored {
+	background-color: #e0f2fe !important;
+	color: #0369a1 !important;
+	font-weight: 600 !important;
+	font-size: 11px !important;
+	padding: 2px 8px !important;
+	border-radius: 4px !important;
+	display: inline-block !important;
+	border: 1px solid #bae6fd !important;
+}
+
+.ai1wm-backups .ai1wm-backup-label-holder .ai1wm-backup-label-field {
+	border-radius: 4px !important;
+	border: 1px solid #8c8f94 !important;
+	padding: 3px 8px !important;
+	font-size: 12px !important;
+	width: auto !important;
+	max-width: 250px !important;
+}
+
+.mwm-create-backup-btn {
+	background: #2271b1 !important;
+	border-color: #2271b1 !important;
+	color: #ffffff !important;
+	font-size: 13.5px !important;
+	font-weight: 600 !important;
+	padding: 10px 20px !important;
+	border-radius: 6px !important;
+	display: inline-flex !important;
+	align-items: center !important;
+	gap: 8px !important;
+	box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1) !important;
+	transition: all 0.15s ease !important;
+}
+
+.mwm-create-backup-btn:hover {
+	background: #135e96 !important;
+	border-color: #135e96 !important;
+	color: #ffffff !important;
+}
+
+/* ==========================================================================
+   8. Barra Lateral de Diagnóstico (Sidebar)
    ========================================================================== */
 .mwm-status-card {
 	background: #ffffff;
@@ -539,7 +763,7 @@
 }
 
 /* ==========================================================================
-   7. Modal de Progreso y Acciones (2026 Modern Overlay)
+   9. Modal de Progreso y Acciones (2026 Modern Overlay)
    ========================================================================== */
 .ai1wm-overlay {
 	background: rgba(15, 23, 42, 0.65) !important;

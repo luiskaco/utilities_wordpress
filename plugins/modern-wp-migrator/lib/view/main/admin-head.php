@@ -30,12 +30,19 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 ?>
 
-<link rel="stylesheet" href="<?php echo esc_url( wp_make_link_relative( AI1WM_URL ) . '/lib/view/assets/css/modern-ui.css?v=' . AI1WM_VERSION ); ?>" type="text/css" media="all" />
+<link rel="stylesheet" href="<?php echo esc_url( Ai1wm_Template::asset_link( 'css/modern-ui.css' ) ); ?>" type="text/css" media="all" />
 
 <script type="text/javascript">
 	jQuery(document).ready(function($) {
+		// Cerrar dropdown al seleccionar opción
 		$(document).on('click', '.ai1wm-dropdown-menu a', function() {
 			$('.ai1wm-button-group').removeClass('ai1wm-open');
+		});
+		// Cerrar dropdown al hacer click fuera
+		$(document).on('click', function(e) {
+			if (!$(e.target).closest('.ai1wm-button-group').length) {
+				$('.ai1wm-button-group').removeClass('ai1wm-open');
+			}
 		});
 	});
 </script>

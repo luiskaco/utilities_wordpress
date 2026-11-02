@@ -1040,7 +1040,8 @@ class Ai1wm_Main_Controller {
 	public function register_backups_scripts_and_styles() {
 		ai1wm_register_style(
 			'ai1wm_backups',
-			Ai1wm_Template::asset_link( 'css/backups.min.css' )
+			Ai1wm_Template::asset_link( 'css/backups.min.css' ),
+			array( 'ai1wm_servmask' )
 		);
 
 		ai1wm_register_script(
@@ -1146,7 +1147,7 @@ class Ai1wm_Main_Controller {
 	 * @return void
 	 */
 	public function enqueue_export_scripts_and_styles( $hook ) {
-		if ( stripos( 'toplevel_page_ai1wm_export', $hook ) === false ) {
+		if ( false === strpos( $hook, 'ai1wm_export' ) ) {
 			return;
 		}
 
@@ -1168,7 +1169,7 @@ class Ai1wm_Main_Controller {
 	 * @return void
 	 */
 	public function enqueue_import_scripts_and_styles( $hook ) {
-		if ( stripos( 'all-in-one-wp-migration_page_ai1wm_import', $hook ) === false ) {
+		if ( false === strpos( $hook, 'ai1wm_import' ) ) {
 			return;
 		}
 
@@ -1190,7 +1191,7 @@ class Ai1wm_Main_Controller {
 	 * @return void
 	 */
 	public function enqueue_backups_scripts_and_styles( $hook ) {
-		if ( stripos( 'all-in-one-wp-migration_page_ai1wm_backups', $hook ) === false ) {
+		if ( false === strpos( $hook, 'ai1wm_backups' ) ) {
 			return;
 		}
 
@@ -1212,7 +1213,7 @@ class Ai1wm_Main_Controller {
 	 * @return void
 	 */
 	public function enqueue_schedules_scripts_and_styles( $hook ) {
-		if ( stripos( 'all-in-one-wp-migration_page_ai1wm_schedules', $hook ) === false ) {
+		if ( false === strpos( $hook, 'ai1wm_schedules' ) ) {
 			return;
 		}
 
@@ -1234,7 +1235,7 @@ class Ai1wm_Main_Controller {
 	 * @return void
 	 */
 	public function enqueue_reset_scripts_and_styles( $hook ) {
-		if ( stripos( 'all-in-one-wp-migration_page_ai1wm_reset', $hook ) === false ) {
+		if ( false === strpos( $hook, 'ai1wm_reset' ) ) {
 			return;
 		}
 
