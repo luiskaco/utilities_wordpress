@@ -10,6 +10,7 @@ Repositorio central de micro-plugins, utilidades y herramientas modulares para W
 |---|---|---|---|---|
 | [**Essential Hardening & Security**](./plugins/essential-hardening/) | Seguridad & Hardening | `1.1.0` | `Producción` | Suite de 12 escudos: Micro-WAF, mitigación de fuerza bruta (rate limit), protección de uploads, desactiva comentarios (403 directo), anti-enumeración, cabeceras HTTP y anonimización de huellas. |
 | [**Modern WP Migrator**](./plugins/modern-wp-migrator/) | Migración & Backups | `7.113.0` | `Producción` | Motor de migración sin restricciones: límite de subida desbloqueado a 500 GB, restauración en 1 clic directa, sin telemetría ni publicidad, compatible con PHP 8.3+. |
+| [**WP LLMs.txt Manager**](./plugins/wp-llms-txt/) | SEO & Inteligencia Artificial | `1.0.0` | `Producción` | Generador, editor y endpoint virtual para servir archivos estandarizados `/llms.txt` y `/llms-full.txt` optimizados para indexación por LLMs (llmstxt.org). |
 
 ---
 
@@ -38,6 +39,7 @@ Repositorio central de micro-plugins, utilidades y herramientas modulares para W
 
 - [Guía técnica de Essential Hardening & Security](./docs/essential-hardening.md)
 - [Guía técnica de Modern WP Migrator](./docs/modern-wp-migrator.md)
+- [Guía técnica de WP LLMs.txt Manager](./docs/wp-llms-txt.md)
 - [Guía para agregar y desarrollar nuevos plugins](./docs/DEVELOPMENT.md)
 
 ---
