@@ -1,0 +1,25 @@
+# =============================================================================
+# Gitignore para Repositorio de Plugins y Utilidades de WordPress
+# =============================================================================
+
+# Ignorar todo por defecto
+/*
+
+# Excepciones que SI se versionan
+!/.gitignore
+!/README.md
+!/LICENSE
+!/docs/
+!/docs/**
+!/plugins/
+!/plugins/**
+
+# Basura del sistema y editores
+.DS_Store
+Thumbs.db
+*.log
+*.tmp
+.idea/
+.vscode/
+node_modules/
+vendor/
