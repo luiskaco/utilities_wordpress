@@ -1,28 +1,6 @@
 <?php
 /**
- * Copyright (C) 2014-2025 ServMask Inc.
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- *
- * Attribution: This code is part of the All-in-One WP Migration plugin, developed by
- *
- * ███████╗███████╗██████╗ ██╗   ██╗███╗   ███╗ █████╗ ███████╗██╗  ██╗
- * ██╔════╝██╔════╝██╔══██╗██║   ██║████╗ ████║██╔══██╗██╔════╝██║ ██╔╝
- * ███████╗█████╗  ██████╔╝██║   ██║██╔████╔██║███████║███████╗█████╔╝
- * ╚════██║██╔══╝  ██╔══██╗╚██╗ ██╔╝██║╚██╔╝██║██╔══██║╚════██║██╔═██╗
- * ███████║███████╗██║  ██║ ╚████╔╝ ██║ ╚═╝ ██║██║  ██║███████║██║  ██╗
- * ╚══════╝╚══════╝╚═╝  ╚═╝  ╚═══╝  ╚═╝     ╚═╝╚═╝  ╚═╝╚══════╝╚═╝  ╚═╝
+ * Modern WP Migrator - Import Buttons View
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -34,15 +12,28 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 <div class="ai1wm-import-form">
 	<div class="hide-if-no-js">
-		<div class="ai1wm-drag-drop-area" id="ai1wm-drag-drop-area">
+		<div class="ai1wm-drag-drop-area mwm-dropzone" id="ai1wm-drag-drop-area">
 			<div id="ai1wm-import-init">
-				<p>
-					<i class="ai1wm-icon-cloud-upload"></i><br />
-					<?php esc_html_e( 'Drag & Drop a backup to import it', 'all-in-one-wp-migration' ); ?>
+				<div class="mwm-dropzone-illustration">
+					<span class="dashicons dashicons-cloud-upload mwm-cloud-icon"></span>
+				</div>
+				<h3 class="mwm-dropzone-title">
+					<?php esc_html_e( 'Arrastra y suelta tu archivo de respaldo (.wpress) aquí', 'modern-wp-migrator' ); ?>
+				</h3>
+				<p class="mwm-dropzone-sub">
+					<?php esc_html_e( 'O usa el botón inferior para explorar tus carpetas locales', 'modern-wp-migrator' ); ?>
 				</p>
-				<div class="ai1wm-button-group ai1wm-button-import ai1wm-expandable">
-					<div class="ai1wm-button-main">
-						<span role="list" aria-label="<?php esc_attr_e( 'Import From', 'all-in-one-wp-migration' ); ?>"><?php esc_html_e( 'Import From', 'all-in-one-wp-migration' ); ?></span>
+				<div class="mwm-dropzone-badge">
+					<span class="dashicons dashicons-yes-alt"></span>
+					<?php esc_html_e( 'Límite de subida: hasta 500 GB de una sola vez', 'modern-wp-migrator' ); ?>
+				</div>
+
+				<div class="ai1wm-button-group ai1wm-button-import ai1wm-expandable mwm-import-btn-group">
+					<div class="ai1wm-button-main mwm-btn-main">
+						<span class="dashicons dashicons-open-folder" style="vertical-align: middle; margin-right: 6px;"></span>
+						<span role="list" aria-label="<?php esc_attr_e( 'Importar Desde', 'modern-wp-migrator' ); ?>">
+							<?php esc_html_e( 'Seleccionar Origen del Archivo', 'modern-wp-migrator' ); ?>
+						</span>
 						<span class="ai1mw-lines">
 							<span class="ai1wm-line ai1wm-line-first"></span>
 							<span class="ai1wm-line ai1wm-line-second"></span>

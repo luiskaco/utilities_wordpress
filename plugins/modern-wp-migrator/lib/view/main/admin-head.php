@@ -30,6 +30,8 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 ?>
 
+<link rel="stylesheet" href="<?php echo esc_url( wp_make_link_relative( AI1WM_URL ) . '/lib/view/assets/css/modern-ui.css?v=' . AI1WM_VERSION ); ?>" type="text/css" media="all" />
+
 <style type="text/css" media="all">
 	@font-face {
 		font-family: 'servmask';

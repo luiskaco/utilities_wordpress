@@ -19,6 +19,7 @@ Herramienta completa, modernizada y sin restricciones para la migración, export
 
 | Característica | Detalle Técnico |
 |---|---|
+| **Interfaz Modernizada (2026 UI)** | Pestañas de navegación instantánea, drag & drop de alta visibilidad y tarjetas diagnósticas |
 | **Formato de archivo** | Archivos comprimidos `.wpress` estándar |
 | **Límite de subida** | 500 GB (prácticamente ilimitado) |
 | **Búsqueda y reemplazo** | Reemplazo serializado automático de dominios y rutas |
