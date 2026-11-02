@@ -330,33 +330,69 @@
 	color: #0e6224;
 }
 
-.mwm-import-btn-group,
-.mwm-export-btn-group {
-	display: inline-block;
+/* ==========================================================================
+   5. Dropdowns de Exportación e Importación
+   ========================================================================== */
+.ai1wm-button-group {
+	border: 2px solid #2271b1 !important;
+	border-radius: 6px !important;
+	overflow: visible !important;
+	background: #ffffff !important;
+	color: #2271b1 !important;
+	display: inline-block !important;
 }
 
-.mwm-btn-main,
-.mwm-btn-export-main {
+.ai1wm-button-group .ai1wm-button-main {
 	background: #2271b1 !important;
 	border-color: #2271b1 !important;
 	color: #ffffff !important;
 	font-size: 14px !important;
 	font-weight: 600 !important;
-	padding: 12px 24px !important;
-	border-radius: 6px !important;
-	box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12) !important;
+	padding: 10px 48px 10px 22px !important;
+	border-radius: 4px !important;
+	box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1) !important;
 	transition: all 0.15s ease !important;
 }
 
-.mwm-btn-main:hover,
-.mwm-btn-export-main:hover {
+.ai1wm-button-group .ai1wm-button-main:hover {
 	background: #135e96 !important;
 	border-color: #135e96 !important;
-	box-shadow: 0 2px 6px rgba(0, 0, 0, 0.18) !important;
+}
+
+.ai1wm-line {
+	background: #ffffff !important;
+}
+
+/* Corregir el enorme espacio vacío de 456px hardcodeado en la versión original */
+.ai1wm-button-group.ai1wm-button-export.ai1wm-open > .ai1wm-dropdown-menu,
+.ai1wm-button-group.ai1wm-button-import.ai1wm-open > .ai1wm-dropdown-menu {
+	height: auto !important;
+	max-height: 280px !important;
+	border: 1px solid #ccd0d4 !important;
+	border-top: none !important;
+	border-radius: 0 0 6px 6px !important;
+	background: #ffffff !important;
+	box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12) !important;
+}
+
+.ai1wm-dropdown-menu li a {
+	color: #1d2327 !important;
+	padding: 10px 20px !important;
+	font-size: 13.5px !important;
+	font-weight: 600 !important;
+	display: flex !important;
+	align-items: center !important;
+	gap: 8px !important;
+	transition: all 0.15s ease !important;
+}
+
+.ai1wm-dropdown-menu li a:hover {
+	background: #f0f6fc !important;
+	color: #2271b1 !important;
 }
 
 /* ==========================================================================
-   5. Barra Lateral de Diagnóstico (Sidebar)
+   6. Barra Lateral de Diagnóstico (Sidebar)
    ========================================================================== */
 .mwm-status-card {
 	background: #ffffff;
@@ -503,22 +539,100 @@
 }
 
 /* ==========================================================================
-   6. Botones de Acción de Copias de Seguridad (Backups)
+   7. Modal de Progreso y Acciones (2026 Modern Overlay)
    ========================================================================== */
-.mwm-create-backup-btn {
-	display: inline-flex !important;
-	align-items: center !important;
-	gap: 8px !important;
-	font-size: 14px !important;
-	font-weight: 600 !important;
-	padding: 10px 20px !important;
-	border-radius: 6px !important;
-	text-decoration: none !important;
-	box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1) !important;
+.ai1wm-overlay {
+	background: rgba(15, 23, 42, 0.65) !important;
+	backdrop-filter: blur(4px) !important;
+	-webkit-backdrop-filter: blur(4px) !important;
+	z-index: 99999 !important;
 }
 
-.mwm-create-backup-btn .dashicons {
-	font-size: 18px;
-	width: 18px;
-	height: 18px;
+.ai1wm-modal-container {
+	background: #ffffff !important;
+	border-radius: 14px !important;
+	padding: 34px 38px !important;
+	box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.15), 0 10px 10px -5px rgba(0, 0, 0, 0.08) !important;
+	border: 1px solid rgba(226, 232, 240, 0.9) !important;
+	max-width: 480px !important;
+	width: 90% !important;
+	text-align: center !important;
+	z-index: 100000 !important;
+}
+
+.ai1wm-modal-container section h1 {
+	margin: 0 0 14px 0 !important;
+	padding: 0 !important;
+	border: none !important;
+}
+
+.ai1wm-modal-container .ai1wm-icon-spinner {
+	font-size: 40px !important;
+	color: #2271b1 !important;
+	display: inline-block !important;
+}
+
+.ai1wm-modal-container section p {
+	font-size: 15px !important;
+	font-weight: 600 !important;
+	color: #1d2327 !important;
+	margin: 12px 0 24px 0 !important;
+	line-height: 1.5 !important;
+}
+
+.ai1wm-modal-container button.ai1wm-button-red {
+	background: #ffffff !important;
+	border: 1px solid #d63638 !important;
+	color: #d63638 !important;
+	font-size: 13px !important;
+	font-weight: 600 !important;
+	padding: 8px 18px !important;
+	border-radius: 6px !important;
+	cursor: pointer !important;
+	transition: all 0.15s ease !important;
+	box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05) !important;
+}
+
+.ai1wm-modal-container button.ai1wm-button-red:hover {
+	background: #d63638 !important;
+	color: #ffffff !important;
+}
+
+.ai1wm-modal-container a.ai1wm-button-green,
+.ai1wm-modal-container button.ai1wm-button-green {
+	background: #008a20 !important;
+	border-color: #008a20 !important;
+	color: #ffffff !important;
+	font-size: 15px !important;
+	font-weight: 700 !important;
+	padding: 12px 28px !important;
+	border-radius: 8px !important;
+	text-decoration: none !important;
+	display: inline-block !important;
+	box-shadow: 0 2px 6px rgba(0, 138, 32, 0.3) !important;
+	transition: all 0.15s ease !important;
+}
+
+.ai1wm-modal-container a.ai1wm-button-green:hover,
+.ai1wm-modal-container button.ai1wm-button-green:hover {
+	background: #00701a !important;
+	transform: translateY(-1px) !important;
+	box-shadow: 0 4px 10px rgba(0, 138, 32, 0.4) !important;
+}
+
+/* Barra de progreso moderna */
+.ai1wm-progress-bar {
+	background: #f0f0f1 !important;
+	border-radius: 10px !important;
+	height: 12px !important;
+	overflow: hidden !important;
+	margin: 16px 0 !important;
+	border: none !important;
+}
+
+.ai1wm-progress-bar-meter {
+	background: linear-gradient(90deg, #2271b1 0%, #72aee6 100%) !important;
+	border-radius: 10px !important;
+	height: 100% !important;
+	transition: width 0.3s ease !important;
 }

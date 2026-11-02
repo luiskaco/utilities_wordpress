@@ -32,6 +32,14 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 <link rel="stylesheet" href="<?php echo esc_url( wp_make_link_relative( AI1WM_URL ) . '/lib/view/assets/css/modern-ui.css?v=' . AI1WM_VERSION ); ?>" type="text/css" media="all" />
 
+<script type="text/javascript">
+	jQuery(document).ready(function($) {
+		$(document).on('click', '.ai1wm-dropdown-menu a', function() {
+			$('.ai1wm-button-group').removeClass('ai1wm-open');
+		});
+	});
+</script>
+
 <style type="text/css" media="all">
 	@font-face {
 		font-family: 'servmask';
