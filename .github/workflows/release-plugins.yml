@@ -1,0 +1,77 @@
+name: Release WordPress Plugin
+
+on:
+  push:
+    tags:
+      - '*-v*'
+  workflow_dispatch:
+    inputs:
+      plugin:
+        description: 'Nombre de la carpeta del plugin (ej: wp-llms-txt)'
+        required: true
+        type: choice
+        options:
+          - wp-llms-txt
+          - essential-hardening
+          - modern-wp-migrator
+      version:
+        description: 'Versión del plugin (ej: 1.0.1)'
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout del repositorio
+        uses: actions/checkout@v4
+
+      - name: Determinar plugin y versión
+        id: vars
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            PLUGIN="${{ github.event.inputs.plugin }}"
+            VERSION="${{ github.event.inputs.version }}"
+            TAG="${PLUGIN}-v${VERSION}"
+          else
+            TAG="${{ github.ref_name }}"
+            # Extraer slug antes de -v y versión después de -v
+            PLUGIN=$(echo "$TAG" | sed -E 's/-v[0-9].*//')
+            VERSION=$(echo "$TAG" | sed -E 's/.*-v//')
+          fi
+
+          echo "plugin=$PLUGIN" >> $GITHUB_OUTPUT
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "tag=$TAG" >> $GITHUB_OUTPUT
+
+      - name: Verificar que el plugin existe
+        run: |
+          PLUGIN_DIR="plugins/${{ steps.vars.outputs.plugin }}"
+          if [ ! -d "$PLUGIN_DIR" ]; then
+            echo "Error: El directorio $PLUGIN_DIR no existe."
+            exit 1
+          fi
+
+      - name: Empaquetar plugin para distribución en WordPress
+        run: |
+          PLUGIN="${{ steps.vars.outputs.plugin }}"
+          mkdir -p dist_build/${PLUGIN}
+          cp -r plugins/${PLUGIN}/* dist_build/${PLUGIN}/
+          
+          # Crear ZIP con la estructura nativa requerida por WordPress (<slug>/...)
+          cd dist_build
+          zip -r "../${PLUGIN}.zip" "${PLUGIN}"
+          cd ..
+
+      - name: Publicar Release en GitHub con el archivo ZIP
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.vars.outputs.tag }}
+          name: "${{ steps.vars.outputs.plugin }} v${{ steps.vars.outputs.version }}"
+          files: "${{ steps.vars.outputs.plugin }}.zip"
+          generate_release_notes: true
+          draft: false
+          prerelease: false

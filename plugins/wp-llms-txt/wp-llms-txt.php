@@ -59,6 +59,9 @@ final class WP_LLMs_Txt_Manager {
 	private function __construct() {
 		$this->options = $this->get_options();
 
+		// Verificador de actualizaciones automáticas desde GitHub (PUC)
+		$this->init_update_checker();
+
 		// Enrutamiento virtual
 		add_action( 'init', array( $this, 'register_rewrite_rules' ) );
 		add_filter( 'query_vars', array( $this, 'register_query_vars' ) );
@@ -70,6 +73,55 @@ final class WP_LLMs_Txt_Manager {
 			add_action( 'admin_init', array( $this, 'handle_admin_actions' ) );
 			add_filter( 'plugin_action_links_' . plugin_basename( WP_LLMS_TXT_FILE ), array( $this, 'add_plugin_action_links' ) );
 		}
+	}
+
+	/**
+	 * Inicializar el verificador de actualizaciones automáticas desde GitHub (PUC).
+	 */
+	private function init_update_checker(): void {
+		$puc_file = __DIR__ . '/vendor/plugin-update-checker/plugin-update-checker.php';
+		if ( ! file_exists( $puc_file ) ) {
+			return;
+		}
+
+		require_once $puc_file;
+
+		if ( ! class_exists( '\YahnisElsts\PluginUpdateChecker\v5\PucFactory' ) ) {
+			return;
+		}
+
+		$update_checker = \YahnisElsts\PluginUpdateChecker\v5\PucFactory::buildUpdateChecker(
+			'https://github.com/luiskaco/utilities_wordpress/',
+			WP_LLMS_TXT_FILE,
+			'wp-llms-txt'
+		);
+
+		// Filtrar solo los releases con tag de este plugin (ej: wp-llms-txt-v1.0.1)
+		$vcs_api = $update_checker->getVcsApi();
+		if ( method_exists( $vcs_api, 'setReleaseVersionFilter' ) ) {
+			$vcs_api->setReleaseVersionFilter( '/^wp-llms-txt-/i' );
+		}
+
+		// Descargar exclusivamente el archivo ZIP correspondiente a este plugin
+		if ( method_exists( $vcs_api, 'enableReleaseAssets' ) ) {
+			$vcs_api->enableReleaseAssets(
+				'/^wp-llms-txt.*\.zip$/i',
+				\YahnisElsts\PluginUpdateChecker\v5p7\Vcs\Api::REQUIRE_RELEASE_ASSETS
+			);
+		}
+
+		// Normalizar la versión devuelta por el tag para la comparación semver de WordPress
+		$normalize_version = function( $info_or_update ) {
+			if ( $info_or_update && isset( $info_or_update->version ) ) {
+				if ( preg_match( '/^wp-llms-txt-v?([0-9\.]+)/i', $info_or_update->version, $matches ) ) {
+					$info_or_update->version = $matches[1];
+				}
+			}
+			return $info_or_update;
+		};
+
+		$update_checker->addFilter( 'request_info_result', $normalize_version );
+		$update_checker->addFilter( 'request_update_result', $normalize_version );
 	}
 
 	/**

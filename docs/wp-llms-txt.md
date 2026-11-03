@@ -41,3 +41,13 @@ Se utiliza una única clave serializada: `wp_llms_txt_options` conteniendo:
 - `llms_full_txt` (string): Contenido Markdown extendido para `/llms-full.txt`.
 - `sync_physical_file` (bool): Bandera para replicar en el disco físico.
 - `enable_full_txt` (bool): Habilitador del endpoint extendido.
+
+---
+
+## 5. Actualizaciones Automáticas vía GitHub (PUC)
+
+El plugin incorpora `Plugin Update Checker (v5.7)` para recibir actualizaciones automáticas directamente desde GitHub:
+- **Repositorio:** `luiskaco/utilities_wordpress`
+- **Filtro de Versión:** `setReleaseVersionFilter('/^wp-llms-txt-/i')`
+- **Asset Requerido:** `enableReleaseAssets('/^wp-llms-txt.*\.zip$/i', REQUIRE_RELEASE_ASSETS)`
+- **Normalización de Versión:** Filtro sobre `request_info_result` y `request_update_result` para transformar `wp-llms-txt-vX.Y.Z` en `X.Y.Z` semver estándar de WordPress.

@@ -54,3 +54,21 @@ utilities_wordpress/
    ```cmd
    mklink /J "C:\laragon\www\pluginWordpress\wp-content\plugins\<nombre-plugin>" "C:\laragon\www\pluginWordpress\plugins\<nombre-plugin>"
    ```
+
+---
+
+## 🚀 Publicación de Versiones y Actualizaciones Automáticas (PUC)
+
+El repositorio usa **GitHub Actions** para empaquetar cada plugin en su propio archivo `.zip` e integrarlo con **Plugin Update Checker (PUC)**.
+
+### Cómo publicar una nueva versión de un plugin:
+1. Incrementa la versión en la cabecera PHP y constante `VERSION` de tu plugin.
+2. Crea una etiqueta git con el formato `<slug-plugin>-v<version>` y súbela:
+   ```bash
+   git tag wp-llms-txt-v1.0.1
+   git push origin wp-llms-txt-v1.0.1
+   ```
+3. GitHub Actions empaquetará automáticamente la carpeta del plugin en `<slug-plugin>.zip` y creará un Release en GitHub.
+4. Cualquier sitio WordPress con el plugin instalado detectará la actualización y permitirá actualizar en un clic desde el escritorio.
+
+*También puedes disparar el empaquetado manualmente desde la pestaña **Actions > Release WordPress Plugin** en GitHub seleccionando el plugin y la versión.*

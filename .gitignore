@@ -13,6 +13,8 @@
 !/docs/**
 !/plugins/
 !/plugins/**
+!/.github/
+!/.github/**
 
 # Basura del sistema y editores
 .DS_Store
