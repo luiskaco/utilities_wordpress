@@ -3,7 +3,7 @@
  * Plugin Name:       WP LLMs.txt Manager
  * Plugin URI:        https://github.com/luiskaco/utilities_wordpress
  * Description:       Genera, edita y sirve archivos llms.txt y llms-full.txt de forma virtual en la raíz del sitio según la especificación llmstxt.org para optimizar la indexación por modelos de lenguaje (LLMs) y motores de IA.
- * Version:           1.0.0
+ * Version:           1.0.1
  * Requires at least: 5.8
  * Requires PHP:      7.4
  * Author:            WordPress AI Utilities
@@ -22,7 +22,7 @@ final class WP_LLMs_Txt_Manager {
 	/**
 	 * Versión del plugin.
 	 */
-	public const VERSION = '1.0.0';
+	public const VERSION = '1.0.1';
 
 	/**
 	 * Clave de opciones en wp_options.
