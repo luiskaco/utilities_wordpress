@@ -3,7 +3,7 @@
  * Plugin Name:       Essential Hardening & Security
  * Plugin URI:        https://github.com/luiskaco/utilities_wordpress
  * Description:       Suite ligera, modular y de rendimiento cero para hardening en WordPress. Cortafuegos Micro-WAF, mitigación de fuerza bruta, protección de uploads, bloqueo de enumeración de usuarios, desactivación total de comentarios y spam, cabeceras HTTP defensivas y anonimización de huellas del CMS.
- * Version:           1.1.0
+ * Version:           1.1.1
  * Requires at least: 5.8
  * Requires PHP:      7.4
  * Author:            Web Security Tools
@@ -23,7 +23,7 @@ final class Essential_Hardening {
 	/**
 	 * Versión del plugin.
 	 */
-	public const VERSION = '1.1.0';
+	public const VERSION = '1.1.1';
 
 	/**
 	 * Clave de opciones en la base de datos.

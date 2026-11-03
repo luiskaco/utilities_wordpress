@@ -2,7 +2,7 @@
 
 Suite ultraligera, modular y sin dependencias para el endurecimiento (*hardening*) y protección perimetral de cualquier instalación WordPress. Diseñada para proteger portales institucionales, blogs, tiendas o sitios corporativos con cero sobrecarga técnica y sin tablas adicionales en base de datos.
 
-- **Versión:** 1.1.0
+- **Versión:** 1.1.1
 - **Licencia:** GPL-2.0-or-later
 - **Dependencias:** Cero (PHP nativo + Hooks de WordPress)
 
