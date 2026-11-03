@@ -92,5 +92,28 @@ if ( file_exists( __DIR__ . '/lib/vendor/plugin-update-checker/plugin-update-che
 
 		$ai1wm_update_checker->addFilter( 'request_info_result', $ai1wm_normalize_version );
 		$ai1wm_update_checker->addFilter( 'request_update_result', $ai1wm_normalize_version );
+
+		// Monorepo rewrite: GitHub API busca en la raíz por defecto, reescribir a la subcarpeta del plugin
+		add_filter(
+			'pre_http_request',
+			function( $preempt, $parsed_args, $url ) {
+				static $in_flight = false;
+				if ( $in_flight || ! is_string( $url ) ) {
+					return $preempt;
+				}
+
+				if ( false !== strpos( $url, 'contents/modern-wp-migrator.php' ) ) {
+					$in_flight = true;
+					$target_url = str_replace( 'contents/modern-wp-migrator.php', 'contents/plugins/modern-wp-migrator/modern-wp-migrator.php', $url );
+					$response = wp_remote_get( $target_url, $parsed_args );
+					$in_flight = false;
+					return $response;
+				}
+
+				return $preempt;
+			},
+			10,
+			3
+		);
 	}
 }
