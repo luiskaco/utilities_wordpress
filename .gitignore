@@ -8,6 +8,11 @@
 # Excepciones que SI se versionan
 !/.gitignore
 !/README.md
+!/AGENTS.md
+!/CLAUDE.md
+!/.agents/
+!/.claude/
+/.claude/settings.local.json
 !/LICENSE
 !/docs/
 !/docs/**
