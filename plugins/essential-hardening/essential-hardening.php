@@ -14,6 +14,10 @@
 
 defined( 'ABSPATH' ) || exit;
 
+if ( ! defined( 'ESSENTIAL_HARDENING_FILE' ) ) {
+	define( 'ESSENTIAL_HARDENING_FILE', __FILE__ );
+}
+
 final class Essential_Hardening {
 
 	/**
@@ -56,12 +60,62 @@ final class Essential_Hardening {
 	private function __construct() {
 		$this->options = $this->get_settings();
 		$this->init_modules();
+		$this->init_update_checker();
 
 		if ( is_admin() ) {
 			add_action( 'admin_menu', array( $this, 'register_admin_menu' ) );
 			add_action( 'admin_init', array( $this, 'register_settings' ) );
-			add_filter( 'plugin_action_links_' . plugin_basename( __FILE__ ), array( $this, 'add_action_links' ) );
+			add_filter( 'plugin_action_links_' . plugin_basename( ESSENTIAL_HARDENING_FILE ), array( $this, 'add_action_links' ) );
 		}
+	}
+
+	/**
+	 * Inicializar el verificador de actualizaciones automáticas desde GitHub (PUC).
+	 */
+	private function init_update_checker(): void {
+		$puc_file = __DIR__ . '/vendor/plugin-update-checker/plugin-update-checker.php';
+		if ( ! file_exists( $puc_file ) ) {
+			return;
+		}
+
+		require_once $puc_file;
+
+		if ( ! class_exists( '\YahnisElsts\PluginUpdateChecker\v5\PucFactory' ) ) {
+			return;
+		}
+
+		$update_checker = \YahnisElsts\PluginUpdateChecker\v5\PucFactory::buildUpdateChecker(
+			'https://github.com/luiskaco/utilities_wordpress/',
+			ESSENTIAL_HARDENING_FILE,
+			'essential-hardening'
+		);
+
+		// Filtrar solo los releases con tag de este plugin (ej: essential-hardening-v1.1.1)
+		$vcs_api = $update_checker->getVcsApi();
+		if ( method_exists( $vcs_api, 'setReleaseVersionFilter' ) ) {
+			$vcs_api->setReleaseVersionFilter( '/^essential-hardening-/i' );
+		}
+
+		// Descargar exclusivamente el archivo ZIP correspondiente a este plugin
+		if ( method_exists( $vcs_api, 'enableReleaseAssets' ) ) {
+			$vcs_api->enableReleaseAssets(
+				'/^essential-hardening.*\.zip$/i',
+				\YahnisElsts\PluginUpdateChecker\v5p7\Vcs\Api::REQUIRE_RELEASE_ASSETS
+			);
+		}
+
+		// Normalizar la versión devuelta por el tag para la comparación semver de WordPress
+		$normalize_version = function( $info_or_update ) {
+			if ( $info_or_update && isset( $info_or_update->version ) ) {
+				if ( preg_match( '/^essential-hardening-v?([0-9\.]+)/i', $info_or_update->version, $matches ) ) {
+					$info_or_update->version = $matches[1];
+				}
+			}
+			return $info_or_update;
+		};
+
+		$update_checker->addFilter( 'request_info_result', $normalize_version );
+		$update_checker->addFilter( 'request_update_result', $normalize_version );
 	}
 
 	/**

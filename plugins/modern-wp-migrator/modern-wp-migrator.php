@@ -1,10 +1,10 @@
 <?php
 /**
  * Plugin Name: Modern WP Migrator
- * Plugin URI: https://github.com/custom/modern-wp-migrator
+ * Plugin URI: https://github.com/luiskaco/utilities_wordpress
  * Description: Herramienta moderna de migración y respaldos para WordPress. Exporta, importa y restaura sitios completos sin restricciones de tamaño. Totalmente optimizado para PHP 8.x.
  * Author: Modern Dev Team
- * Author URI: https://github.com/custom
+ * Author URI: https://github.com/luiskaco/utilities_wordpress
  * Version: 7.113.0
  * Text Domain: modern-wp-migrator
  * Domain Path: /languages
@@ -59,3 +59,38 @@ require_once __DIR__ . DIRECTORY_SEPARATOR . 'loader.php';
 
 // Plugin initialization
 $main_controller = new Ai1wm_Main_Controller();
+
+// Initialize Plugin Update Checker (PUC)
+if ( file_exists( __DIR__ . '/lib/vendor/plugin-update-checker/plugin-update-checker.php' ) ) {
+	require_once __DIR__ . '/lib/vendor/plugin-update-checker/plugin-update-checker.php';
+	if ( class_exists( '\YahnisElsts\PluginUpdateChecker\v5\PucFactory' ) ) {
+		$ai1wm_update_checker = \YahnisElsts\PluginUpdateChecker\v5\PucFactory::buildUpdateChecker(
+			'https://github.com/luiskaco/utilities_wordpress/',
+			__FILE__,
+			'modern-wp-migrator'
+		);
+
+		$ai1wm_vcs = $ai1wm_update_checker->getVcsApi();
+		if ( method_exists( $ai1wm_vcs, 'setReleaseVersionFilter' ) ) {
+			$ai1wm_vcs->setReleaseVersionFilter( '/^modern-wp-migrator-/i' );
+		}
+		if ( method_exists( $ai1wm_vcs, 'enableReleaseAssets' ) ) {
+			$ai1wm_vcs->enableReleaseAssets(
+				'/^modern-wp-migrator.*\.zip$/i',
+				\YahnisElsts\PluginUpdateChecker\v5p7\Vcs\Api::REQUIRE_RELEASE_ASSETS
+			);
+		}
+
+		$ai1wm_normalize_version = function( $info_or_update ) {
+			if ( $info_or_update && isset( $info_or_update->version ) ) {
+				if ( preg_match( '/^modern-wp-migrator-v?([0-9\.]+)/i', $info_or_update->version, $matches ) ) {
+					$info_or_update->version = $matches[1];
+				}
+			}
+			return $info_or_update;
+		};
+
+		$ai1wm_update_checker->addFilter( 'request_info_result', $ai1wm_normalize_version );
+		$ai1wm_update_checker->addFilter( 'request_update_result', $ai1wm_normalize_version );
+	}
+}
