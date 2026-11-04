@@ -8,7 +8,7 @@ Repositorio central de micro-plugins, utilidades y herramientas modulares para W
 
 | Plugin | Categoría | Versión | Estado | Descripción |
 |---|---|---|---|---|
-| [**Essential Hardening & Security**](./plugins/essential-hardening/) | Seguridad & Hardening | `1.4.0` | `Producción` | Suite de 17 escudos y herramientas: Micro-WAF, fuerza bruta configurable, honeypot anti-bot en login, alertas de login admin, 2FA por correo (opcional), registro en vivo de eventos bloqueados, alertas de actualizaciones pendientes, protección de uploads, desactiva comentarios (403 directo), anti-enumeración, cabeceras HTTP y anonimización de huellas. |
+| [**Essential Hardening & Security**](./plugins/essential-hardening/) | Seguridad & Hardening | `1.4.1` | `Producción` | Suite de 17 escudos y herramientas: Micro-WAF, fuerza bruta configurable, honeypot anti-bot en login, alertas de login admin, 2FA por correo (opcional), registro en vivo de eventos bloqueados, alertas de actualizaciones pendientes, protección de uploads, desactiva comentarios (403 directo), anti-enumeración, cabeceras HTTP y anonimización de huellas. |
 | [**Modern WP Migrator**](./plugins/modern-wp-migrator/) | Migración & Backups | `7.113.0` | `Producción` | Motor de migración sin restricciones: límite de subida desbloqueado a 500 GB, restauración en 1 clic directa, sin telemetría ni publicidad, compatible con PHP 8.3+. |
 | [**WP LLMs.txt Manager**](./plugins/wp-llms-txt/) | SEO & Inteligencia Artificial | `1.0.1` | `Producción` | Generador, editor y endpoint virtual para servir archivos estandarizados `/llms.txt` y `/llms-full.txt` optimizados para indexación por LLMs (llmstxt.org). |
 

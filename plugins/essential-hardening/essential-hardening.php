@@ -3,7 +3,7 @@
  * Plugin Name:       Essential Hardening & Security
  * Plugin URI:        https://github.com/luiskaco/utilities_wordpress
  * Description:       Suite ligera, modular y de rendimiento cero para hardening en WordPress. Cortafuegos Micro-WAF, mitigación de fuerza bruta, protección de uploads, bloqueo de enumeración de usuarios, desactivación total de comentarios y spam, cabeceras HTTP defensivas y anonimización de huellas del CMS.
- * Version:           1.4.0
+ * Version:           1.4.1
  * Requires at least: 5.8
  * Requires PHP:      7.4
  * Author:            Web Security Tools
@@ -23,7 +23,7 @@ final class Essential_Hardening {
 	/**
 	 * Versión del plugin.
 	 */
-	public const VERSION = '1.4.0';
+	public const VERSION = '1.4.1';
 
 	/**
 	 * Máximo número de eventos de seguridad registrados en el mini-log.
@@ -917,7 +917,27 @@ final class Essential_Hardening {
 
 		$headers = array( 'Content-Type: text/plain; charset=UTF-8' );
 
-		return wp_mail( $recipient, $subject, $message, $headers );
+		return $this->safe_wp_mail( $recipient, $subject, $message, $headers );
+	}
+
+	/**
+	 * Envío seguro de correos previniendo errores fatales si mail() está deshabilitada en el hosting.
+	 *
+	 * @param string|array $to      Destinatario.
+	 * @param string       $subject Asunto.
+	 * @param string       $message Cuerpo del mensaje.
+	 * @param array        $headers Cabeceras opcionales.
+	 * @return bool True si se despachó con éxito, false en caso de error o función mail() deshabilitada.
+	 */
+	private function safe_wp_mail( $to, string $subject, string $message, array $headers = array() ): bool {
+		try {
+			return (bool) wp_mail( $to, $subject, $message, $headers );
+		} catch ( \Throwable $e ) {
+			if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
+				error_log( 'Essential Hardening - Error en envío de correo (PHPMailer): ' . $e->getMessage() );
+			}
+			return false;
+		}
 	}
 
 	/* ======================================================================
@@ -961,7 +981,7 @@ final class Essential_Hardening {
 		$message .= wp_lostpassword_url() . "\n\n";
 		$message .= "--\nNotificación enviada por Essential Hardening & Security.";
 
-		wp_mail( $recipient, $subject, $message, array( 'Content-Type: text/plain; charset=UTF-8' ) );
+		$this->safe_wp_mail( $recipient, $subject, $message, array( 'Content-Type: text/plain; charset=UTF-8' ) );
 	}
 
 	/* ======================================================================
@@ -1021,7 +1041,15 @@ final class Essential_Hardening {
 			$code
 		);
 
-		wp_mail( $user->user_email, $subject, $message, array( 'Content-Type: text/plain; charset=UTF-8' ) );
+		$mail_sent = $this->safe_wp_mail( $user->user_email, $subject, $message, array( 'Content-Type: text/plain; charset=UTF-8' ) );
+
+		if ( ! $mail_sent ) {
+			// Si el hosting no tiene servicio de correo configurado o mail() está deshabilitada,
+			// no atrapamos al administrador en una pantalla de verificación imposible.
+			delete_transient( 'eh_2fa_' . $token );
+			$this->log_security_event( '2FA Omitido', $this->get_client_ip(), sprintf( __( 'Fallo en envío de código 2FA a %s (servidor sin correo/SMTP). Acceso permitido.', 'essential-hardening' ), $user->user_login ) );
+			return $user;
+		}
 
 		$redirect_url = add_query_arg(
 			array(
@@ -1237,7 +1265,15 @@ final class Essential_Hardening {
 				$recipient = ! empty( $options['update_notify_email'] ) ? $options['update_notify_email'] : get_option( 'admin_email' );
 				echo '<div class="notice notice-success is-dismissible" style="margin-top: 15px;"><p>' . sprintf( esc_html__( 'Correo de prueba enviado con éxito a %s.', 'essential-hardening' ), '<strong>' . esc_html( $recipient ) . '</strong>' ) . '</p></div>';
 			} elseif ( 'failed' === $_GET['eh_email'] ) {
-				echo '<div class="notice notice-error is-dismissible" style="margin-top: 15px;"><p>' . esc_html__( 'No se pudo enviar el correo de prueba. Verifique la configuración de correo de su servidor.', 'essential-hardening' ) . '</p></div>';
+				$mail_func_missing = ! function_exists( 'mail' );
+				echo '<div class="notice notice-error is-dismissible" style="margin-top: 15px;">';
+				echo '<p><strong>' . esc_html__( 'No se pudo enviar el correo de prueba.', 'essential-hardening' ) . '</strong></p>';
+				if ( $mail_func_missing ) {
+					echo '<p>' . esc_html__( 'Causa detectada: La función nativa mail() de PHP está deshabilitada en tu hosting (cPanel). Para poder enviar notificaciones o usar el 2FA debes instalar un plugin de SMTP (como WP Mail SMTP, FluentSMTP o Post SMTP) con tus credenciales de correo.', 'essential-hardening' ) . '</p>';
+				} else {
+					echo '<p>' . esc_html__( 'Verifica que tu servidor o plugin SMTP tenga configurada correctamente la salida de correo.', 'essential-hardening' ) . '</p>';
+				}
+				echo '</div>';
 			}
 		}
 
