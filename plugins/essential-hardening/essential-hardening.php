@@ -3,7 +3,7 @@
  * Plugin Name:       Essential Hardening & Security
  * Plugin URI:        https://github.com/luiskaco/utilities_wordpress
  * Description:       Suite ligera, modular y de rendimiento cero para hardening en WordPress. Cortafuegos Micro-WAF, mitigación de fuerza bruta, protección de uploads, bloqueo de enumeración de usuarios, desactivación total de comentarios y spam, cabeceras HTTP defensivas y anonimización de huellas del CMS.
- * Version:           1.1.1
+ * Version:           1.2.0
  * Requires at least: 5.8
  * Requires PHP:      7.4
  * Author:            Web Security Tools
@@ -23,7 +23,7 @@ final class Essential_Hardening {
 	/**
 	 * Versión del plugin.
 	 */
-	public const VERSION = '1.1.1';
+	public const VERSION = '1.2.0';
 
 	/**
 	 * Clave de opciones en la base de datos.
@@ -162,6 +162,10 @@ final class Essential_Hardening {
 			'protect_uploads'         => true,
 			'clean_head_meta'         => true,
 			'hide_author_body_class'  => true,
+			// Módulos v1.2.0 (Anti-Bot y Rate Limiting Configurable)
+			'login_honeypot'          => true,
+			'throttle_max_attempts'   => 5,
+			'throttle_lockout_duration' => 900,
 		);
 	}
 
@@ -247,6 +251,11 @@ final class Essential_Hardening {
 		// 12. Ocultar logins de usuario en body_class
 		if ( ! empty( $this->options['hide_author_body_class'] ) ) {
 			$this->module_hide_author_body_class();
+		}
+
+		// 13. Honeypot Anti-Bot en pantalla de login (v1.2.0)
+		if ( ! empty( $this->options['login_honeypot'] ) ) {
+			$this->module_login_honeypot();
 		}
 	}
 
@@ -487,17 +496,40 @@ final class Essential_Hardening {
 	}
 
 	public function check_login_throttle( $user, string $username, string $password ) {
-		$ip           = $this->get_client_ip();
-		$lockout_key  = 'eh_lockout_' . md5( $ip );
+		$ip          = $this->get_client_ip();
+		$lockout_key = 'eh_lockout_' . md5( $ip );
 
 		if ( get_transient( $lockout_key ) ) {
+			$duration_seconds = ! empty( $this->options['throttle_lockout_duration'] ) ? absint( $this->options['throttle_lockout_duration'] ) : 900;
+			$human_time       = $this->get_human_lockout_duration( $duration_seconds );
+
 			return new WP_Error(
 				'eh_ip_locked',
-				esc_html__( 'Demasiados intentos fallidos. Su dirección IP ha sido bloqueada temporalmente por 15 minutos.', 'essential-hardening' )
+				sprintf(
+					/* translators: %s: tiempo de bloqueo */
+					esc_html__( 'Demasiados intentos fallidos. Su dirección IP ha sido bloqueada temporalmente por %s.', 'essential-hardening' ),
+					$human_time
+				)
 			);
 		}
 
 		return $user;
+	}
+
+	/**
+	 * Obtener texto legible para la duración del bloqueo.
+	 */
+	private function get_human_lockout_duration( int $seconds ): string {
+		if ( $seconds >= 86400 ) {
+			$days = (int) ( $seconds / 86400 );
+			return sprintf( _n( '%d día', '%d días', $days, 'essential-hardening' ), $days );
+		}
+		if ( $seconds >= 3600 ) {
+			$hours = (int) ( $seconds / 3600 );
+			return sprintf( _n( '%d hora', '%d horas', $hours, 'essential-hardening' ), $hours );
+		}
+		$minutes = (int) ( $seconds / 60 );
+		return sprintf( _n( '%d minuto', '%d minutos', $minutes, 'essential-hardening' ), $minutes );
 	}
 
 	public function record_failed_login( string $username ): void {
@@ -511,13 +543,16 @@ final class Essential_Hardening {
 		// Retardo de 2 segundos para amortiguar ataques masivos de diccionario
 		sleep( 2 );
 
-		if ( $attempts >= 5 ) {
-			// Bloqueo temporal por 15 minutos
-			set_transient( $lockout_key, 1, 15 * MINUTE_IN_SECONDS );
+		$max_attempts     = ! empty( $this->options['throttle_max_attempts'] ) ? absint( $this->options['throttle_max_attempts'] ) : 5;
+		$lockout_duration = ! empty( $this->options['throttle_lockout_duration'] ) ? absint( $this->options['throttle_lockout_duration'] ) : 900;
+
+		if ( $attempts >= $max_attempts ) {
+			// Bloqueo temporal por la duración configurada
+			set_transient( $lockout_key, 1, $lockout_duration );
 			delete_transient( $count_key );
 		} else {
-			// Ventana móvil de conteo de 15 minutos
-			set_transient( $count_key, $attempts, 15 * MINUTE_IN_SECONDS );
+			// Ventana móvil de conteo por la duración configurada
+			set_transient( $count_key, $attempts, $lockout_duration );
 		}
 	}
 
@@ -525,6 +560,42 @@ final class Essential_Hardening {
 		$ip = $this->get_client_ip();
 		delete_transient( 'eh_fail_count_' . md5( $ip ) );
 		delete_transient( 'eh_lockout_' . md5( $ip ) );
+	}
+
+	/* ======================================================================
+	   MÓDULO 13: Honeypot Anti-Bot en Pantalla de Login (v1.2.0)
+	   ====================================================================== */
+
+	private function module_login_honeypot(): void {
+		// Inyectar campo trampa en el formulario de login de WordPress
+		add_action( 'login_form', array( $this, 'render_login_honeypot' ) );
+
+		// Validar antes de evaluar credenciales
+		add_filter( 'authenticate', array( $this, 'validate_login_honeypot' ), 4, 3 );
+	}
+
+	public function render_login_honeypot(): void {
+		?>
+		<p class="eh-hp-field" style="display:none !important; visibility:hidden !important; position:absolute !important; left:-9999px !important; width:1px; height:1px; overflow:hidden;" aria-hidden="true">
+			<label for="eh_login_company"><?php esc_html_e( 'Si eres humano, deja este campo en blanco', 'essential-hardening' ); ?></label>
+			<input type="text" name="eh_login_company" id="eh_login_company" value="" tabindex="-1" autocomplete="off" />
+		</p>
+		<?php
+	}
+
+	public function validate_login_honeypot( $user, string $username, string $password ) {
+		// Si es una petición POST de login y el campo honeypot viene completado, es un bot
+		if ( 'POST' === ( $_SERVER['REQUEST_METHOD'] ?? '' ) && ! empty( $_POST['eh_login_company'] ) ) {
+			// Aplicar retardo disuasivo
+			sleep( 2 );
+
+			return new WP_Error(
+				'eh_bot_detected',
+				esc_html__( 'Acceso bloqueado: actividad automatizada detectada.', 'essential-hardening' )
+			);
+		}
+
+		return $user;
 	}
 
 	/* ======================================================================
@@ -636,8 +707,27 @@ final class Essential_Hardening {
 		$sanitized = array();
 		$defaults  = $this->get_default_settings();
 
+		if ( ! is_array( $input ) ) {
+			$input = array();
+		}
+
 		foreach ( $defaults as $key => $default_val ) {
-			$sanitized[ $key ] = ! empty( $input[ $key ] );
+			if ( is_bool( $default_val ) ) {
+				$sanitized[ $key ] = ! empty( $input[ $key ] );
+			} elseif ( is_int( $default_val ) ) {
+				$sanitized[ $key ] = isset( $input[ $key ] ) ? absint( $input[ $key ] ) : $default_val;
+			}
+		}
+
+		// Validar opciones válidas para rate limiting
+		$valid_attempts = array( 3, 5, 10 );
+		if ( ! in_array( $sanitized['throttle_max_attempts'], $valid_attempts, true ) ) {
+			$sanitized['throttle_max_attempts'] = 5;
+		}
+
+		$valid_durations = array( 900, 1800, 3600, 14400, 86400 );
+		if ( ! in_array( $sanitized['throttle_lockout_duration'], $valid_durations, true ) ) {
+			$sanitized['throttle_lockout_duration'] = 900;
 		}
 
 		return $sanitized;
@@ -654,9 +744,10 @@ final class Essential_Hardening {
 			return;
 		}
 
-		$options      = $this->get_settings();
-		$active_count = count( array_filter( $options ) );
-		$total_count  = count( $this->get_default_settings() );
+		$options         = $this->get_settings();
+		$boolean_options = array_filter( $options, 'is_bool' );
+		$active_count    = count( array_filter( $boolean_options ) );
+		$total_count     = count( array_filter( $this->get_default_settings(), 'is_bool' ) );
 		?>
 		<div class="wrap" id="eh-settings-wrap">
 			<style>
@@ -811,6 +902,31 @@ final class Essential_Hardening {
 					color: #50575e;
 					line-height: 1.45;
 				}
+				.eh-sub-settings {
+					margin-top: 10px;
+					padding-top: 10px;
+					border-top: 1px dashed #dcdcde;
+					display: flex;
+					flex-wrap: wrap;
+					gap: 12px;
+				}
+				.eh-sub-setting {
+					display: flex;
+					flex-direction: column;
+					gap: 4px;
+				}
+				.eh-sub-setting label {
+					font-size: 11px;
+					font-weight: 600;
+					color: #50575e;
+				}
+				.eh-sub-setting select {
+					font-size: 12px;
+					padding: 2px 8px;
+					height: 30px;
+					border-radius: 4px;
+					border-color: #8c8f94;
+				}
 				.eh-submit-bar {
 					margin-top: 20px;
 					display: flex;
@@ -919,7 +1035,39 @@ final class Essential_Hardening {
 									<label for="eh_login_throttle" class="eh-item-label"><?php esc_html_e( 'Rate-Limiting de Login (Throttle)', 'essential-hardening' ); ?></label>
 									<span class="eh-tag eh-tag-access"><?php esc_html_e( 'Fuerza Bruta', 'essential-hardening' ); ?></span>
 								</div>
-								<p class="eh-item-desc"><?php esc_html_e( 'Añade 2s de retardo tras cada fallo y bloquea la IP por 15 minutos al acumular 5 fallos consecutivos usando transients en memoria.', 'essential-hardening' ); ?></p>
+								<p class="eh-item-desc"><?php esc_html_e( 'Añade 2s de retardo tras cada fallo y bloquea temporalmente la IP si supera el umbral de intentos fallidos permitidos.', 'essential-hardening' ); ?></p>
+								<div class="eh-sub-settings">
+									<div class="eh-sub-setting">
+										<label for="eh_throttle_max_attempts"><?php esc_html_e( 'Intentos permitidos:', 'essential-hardening' ); ?></label>
+										<select id="eh_throttle_max_attempts" name="<?php echo esc_attr( self::OPTION_NAME ); ?>[throttle_max_attempts]">
+											<option value="3" <?php selected( $options['throttle_max_attempts'], 3 ); ?>><?php esc_html_e( '3 intentos (Estricto)', 'essential-hardening' ); ?></option>
+											<option value="5" <?php selected( $options['throttle_max_attempts'], 5 ); ?>><?php esc_html_e( '5 intentos (Recomendado)', 'essential-hardening' ); ?></option>
+											<option value="10" <?php selected( $options['throttle_max_attempts'], 10 ); ?>><?php esc_html_e( '10 intentos (Permisivo)', 'essential-hardening' ); ?></option>
+										</select>
+									</div>
+									<div class="eh-sub-setting">
+										<label for="eh_throttle_lockout_duration"><?php esc_html_e( 'Tiempo de bloqueo:', 'essential-hardening' ); ?></label>
+										<select id="eh_throttle_lockout_duration" name="<?php echo esc_attr( self::OPTION_NAME ); ?>[throttle_lockout_duration]">
+											<option value="900" <?php selected( $options['throttle_lockout_duration'], 900 ); ?>><?php esc_html_e( '15 minutos (Estándar)', 'essential-hardening' ); ?></option>
+											<option value="1800" <?php selected( $options['throttle_lockout_duration'], 1800 ); ?>><?php esc_html_e( '30 minutos', 'essential-hardening' ); ?></option>
+											<option value="3600" <?php selected( $options['throttle_lockout_duration'], 3600 ); ?>><?php esc_html_e( '1 hora (Seguro)', 'essential-hardening' ); ?></option>
+											<option value="14400" <?php selected( $options['throttle_lockout_duration'], 14400 ); ?>><?php esc_html_e( '4 horas', 'essential-hardening' ); ?></option>
+											<option value="86400" <?php selected( $options['throttle_lockout_duration'], 86400 ); ?>><?php esc_html_e( '24 horas (Máxima protección)', 'essential-hardening' ); ?></option>
+										</select>
+									</div>
+								</div>
+							</div>
+						</div>
+
+						<!-- Honeypot Anti-Bot en Login -->
+						<div class="eh-item">
+							<input type="checkbox" id="eh_login_honeypot" name="<?php echo esc_attr( self::OPTION_NAME ); ?>[login_honeypot]" value="1" <?php checked( $options['login_honeypot'] ); ?>>
+							<div class="eh-item-body">
+								<div class="eh-item-title-row">
+									<label for="eh_login_honeypot" class="eh-item-label"><?php esc_html_e( 'Honeypot Anti-Bot en Login', 'essential-hardening' ); ?></label>
+									<span class="eh-tag eh-tag-firewall"><?php esc_html_e( 'Sin Captcha', 'essential-hardening' ); ?></span>
+								</div>
+								<p class="eh-item-desc"><?php esc_html_e( 'Inserta un campo trampa invisible en /wp-login.php. Los humanos no lo ven ni deben resolver acertijos, pero los bots automatizados lo completan y quedan bloqueados al instante con HTTP 403.', 'essential-hardening' ); ?></p>
 							</div>
 						</div>
 

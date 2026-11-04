@@ -2,7 +2,7 @@
 
 Suite modular, ultraligera y sin dependencias externas para el endurecimiento y seguridad perimetral integral de sitios WordPress.
 
-- **Versión:** 1.1.0
+- **Versión:** 1.2.0
 - **Licencia:** GPL-2.0-or-later
 - **Compatibilidad:** WordPress 5.8+ | PHP 7.4 - 8.3+
 
@@ -18,7 +18,7 @@ El plugin **Essential Hardening & Security** está diseñado bajo los principios
 
 ---
 
-## 2. Los 12 Módulos de Protección
+## 2. Los 13 Módulos de Protección
 
 ### 2.1. Micro-WAF / Cortafuegos de Peticiones y Query Strings
 Inspecciona tanto la cadena de consulta cruda (`QUERY_STRING`) como la decodificada en cada petición HTTP antes de que los componentes del núcleo o plugins comiencen su procesamiento:
@@ -28,11 +28,12 @@ Inspecciona tanto la cadena de consulta cruda (`QUERY_STRING`) como la decodific
 - **Cross-Site Scripting (XSS):** Bloquea `<script>` y esquemas `javascript:` en parámetros URL.
 - **Respuesta:** Detiene la petición de inmediato con **HTTP 403 Forbidden**. Los administradores autenticados dentro del panel no se ven afectados para evitar falsos positivos durante tareas legítimas.
 
-### 2.2. Mitigación de Fuerza Bruta (Login Throttle & Rate Limiting)
+### 2.2. Mitigación de Fuerza Bruta y Rate-Limiting Configurable (Login Throttle)
 Protege la pantalla de inicio de sesión `/wp-login.php` contra ataques masivos de diccionario:
 - **Retardo disuasivo (Tarpit):** Añade una pausa deliberada de `sleep(2)` segundos al fallar cualquier intento de autenticación, frustrando la velocidad de los bots automatizados.
 - **Bloqueo por IP:** Registra fallos sucesivos utilizando `transients` nativos en memoria indexados por hash de la IP.
-- **Umbral de tolerancia:** Tras 5 intentos fallidos consecutivos en una ventana de 15 minutos, bloquea el acceso temporalmente por 15 minutos arrojando un error de seguridad (`WP_Error: eh_ip_locked`).
+- **Umbral de tolerancia configurable:** Selector de 3 intentos (estricto), 5 intentos (estándar recomendado) o 10 intentos (permisivo).
+- **Duración de bloqueo configurable:** Permite fijar el tiempo de espera en 15 minutos, 30 minutos, 1 hora, 4 horas o 24 horas (`eh_ip_locked`).
 - **Reseteo automático:** Al introducir credenciales correctas, el contador y bloqueo se eliminan al instante.
 
 ### 2.3. Protección del Directorio de Subidas (`wp-content/uploads/`)
@@ -90,27 +91,36 @@ Inyecta cabeceras defensivas estándar en la respuesta HTTP (`send_headers`):
 ### 2.12. Bloqueo de Edición de Archivos PHP
 - Define la constante `DISALLOW_FILE_EDIT = true` para deshabilitar los editores de temas y plugins dentro del panel de administración, mitigando inyecciones de código ante compromisos de sesión.
 
+### 2.13. Honeypot Anti-Bot en Pantalla de Login (Sin Captcha)
+Protección transparente contra bots y atacantes automatizados en `/wp-login.php`:
+- **Campo trampa invisible:** Inyecta un campo camuflado en el formulario de login con estilos ocultos para humanos.
+- **Detección inmediata:** Los bots automatizados que rastrean y autocompletan inputs lo llenan, disparando un bloqueo inmediato con **HTTP 403 Forbidden** y retardo disuasivo de 2 segundos.
+- **Sin molestias:** Los usuarios humanos no ven el campo ni deben resolver captchas visuales. Cero dependencias y privacidad total.
+
 ---
 
 ## 3. Configuración en Base de Datos
 
 El plugin almacena sus preferencias en una única entrada en `wp_options`:
 - **Option Name:** `essential_hardening_settings`
-- **Estructura:** Array asociativo serializado con valores booleanos:
+- **Estructura:** Array asociativo serializado:
   ```php
   array(
-      'disable_comments'       => true,
-      'block_user_enumeration' => true,
-      'security_headers'       => true,
-      'hide_wp_version'        => true,
-      'disable_xmlrpc'         => true,
-      'generic_login_errors'   => true,
-      'disallow_file_edit'     => true,
-      'query_firewall'         => true,
-      'login_throttle'         => true,
-      'protect_uploads'        => true,
-      'clean_head_meta'        => true,
-      'hide_author_body_class' => true,
+      'disable_comments'          => true,
+      'block_user_enumeration'    => true,
+      'security_headers'          => true,
+      'hide_wp_version'           => true,
+      'disable_xmlrpc'            => true,
+      'generic_login_errors'      => true,
+      'disallow_file_edit'        => true,
+      'query_firewall'            => true,
+      'login_throttle'            => true,
+      'protect_uploads'           => true,
+      'clean_head_meta'           => true,
+      'hide_author_body_class'    => true,
+      'login_honeypot'            => true,
+      'throttle_max_attempts'     => 5,
+      'throttle_lockout_duration' => 900,
   )
   ```
 

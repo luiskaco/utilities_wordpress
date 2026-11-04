@@ -2,13 +2,13 @@
 
 Suite ultraligera, modular y sin dependencias para el endurecimiento (*hardening*) y protección perimetral de cualquier instalación WordPress. Diseñada para proteger portales institucionales, blogs, tiendas o sitios corporativos con cero sobrecarga técnica y sin tablas adicionales en base de datos.
 
-- **Versión:** 1.1.1
+- **Versión:** 1.2.0
 - **Licencia:** GPL-2.0-or-later
 - **Dependencias:** Cero (PHP nativo + Hooks de WordPress)
 
 ---
 
-## 🛡️ Los 12 Escudos de Seguridad
+## 🛡️ Los 13 Escudos de Seguridad
 
 ### 1. Cortafuegos de Peticiones y Query Strings (Micro-WAF)
 - Inspecciona en tiempo real las cadenas de consulta (`$_SERVER['QUERY_STRING']` y `$_SERVER['REQUEST_URI']`).
@@ -18,9 +18,10 @@ Suite ultraligera, modular y sin dependencias para el endurecimiento (*hardening
   - Recorrido de directorios y robo de archivos locales (`../../`, `/etc/passwd`, `wp-config.php`).
   - Cross-Site Scripting básico (`<script>`, `javascript:`).
 
-### 2. Mitigación de Fuerza Bruta y Rate-Limiting (Login Throttle)
+### 2. Mitigación de Fuerza Bruta y Rate-Limiting Configurable (Login Throttle)
 - Introduce un retardo disuasivo de **2 segundos** tras cualquier intento de inicio de sesión fallido, inutilizando ataques masivos por diccionario.
-- Registra intentos por IP usando *transients* en memoria y bloquea temporalmente (**HTTP 403 / Error de acceso por 15 minutos**) a cualquier dirección con 5 fallos consecutivos.
+- Umbral configurable de intentos fallidos: **3 intentos (estricto)**, **5 intentos (recomendado)** o **10 intentos (permisivo)**.
+- Tiempo de bloqueo configurable: **15 minutos**, **30 minutos**, **1 hora**, **4 horas** o **24 horas** de bloqueo temporal mediante *transients* en memoria.
 - Libera automáticamente el contador tras un acceso autenticado exitoso.
 
 ### 3. Protección del Directorio de Subidas (`wp-content/uploads/`)
@@ -70,6 +71,11 @@ Suite ultraligera, modular y sin dependencias para el endurecimiento (*hardening
 ### 12. Bloqueo de Edición de Archivos en el Panel
 - Define `DISALLOW_FILE_EDIT = true`, impidiendo la modificación de código PHP desde el editor web de temas y plugins si una sesión de administrador llegase a verse comprometida.
 
+### 13. Honeypot Anti-Bot en Pantalla de Login (Sin Captcha)
+- Inyecta un campo trampa invisible en el formulario de acceso `/wp-login.php`.
+- Los usuarios humanos no lo ven ni deben resolver acertijos visuales. Los bots automatizados que autocompletan formularios lo llenan y son neutralizados de inmediato con **HTTP 403 Forbidden**.
+- Cero dependencias: no requiere cuentas de terceros, APIs ni cookies de rastreo externas.
+
 ---
 
 ## 🚀 Instalación en Cualquier Proyecto WordPress
@@ -78,7 +84,7 @@ Suite ultraligera, modular y sin dependencias para el endurecimiento (*hardening
 1. Copia la carpeta `essential-hardening` dentro de `wp-content/plugins/`.
 2. Ve a **Plugins > Plugins Instalados** en tu panel de WordPress.
 3. Haz clic en **Activar**.
-4. Puedes ajustar o activar/desactivar cualquiera de los 12 escudos en **Ajustes > Seguridad Esencial**.
+4. Puedes ajustar o activar/desactivar cualquiera de los 13 escudos en **Ajustes > Seguridad Esencial**.
 
 ### Opción B: Como Plugin Obligatorio (*Must-Use*)
 1. Copia el archivo `essential-hardening.php` o crea un cargador en `wp-content/mu-plugins/`.
