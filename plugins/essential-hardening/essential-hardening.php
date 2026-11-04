@@ -3,7 +3,7 @@
  * Plugin Name:       Essential Hardening & Security
  * Plugin URI:        https://github.com/luiskaco/utilities_wordpress
  * Description:       Suite ligera, modular y de rendimiento cero para hardening en WordPress. Cortafuegos Micro-WAF, mitigación de fuerza bruta, protección de uploads, bloqueo de enumeración de usuarios, desactivación total de comentarios y spam, cabeceras HTTP defensivas y anonimización de huellas del CMS.
- * Version:           1.3.0
+ * Version:           1.4.0
  * Requires at least: 5.8
  * Requires PHP:      7.4
  * Author:            Web Security Tools
@@ -23,7 +23,12 @@ final class Essential_Hardening {
 	/**
 	 * Versión del plugin.
 	 */
-	public const VERSION = '1.3.0';
+	public const VERSION = '1.4.0';
+
+	/**
+	 * Máximo número de eventos de seguridad registrados en el mini-log.
+	 */
+	public const MAX_EVENT_LOG_ENTRIES = 25;
 
 	/**
 	 * Clave de opciones en la base de datos.
@@ -169,6 +174,10 @@ final class Essential_Hardening {
 			// Módulos v1.3.0 (Notificaciones de Actualizaciones)
 			'update_notifications'      => true,
 			'update_notify_email'       => '',
+			// Módulos v1.4.0 (Alertas de Admin, Registro en Vivo y 2FA)
+			'admin_login_alerts'        => true,
+			'security_event_log'        => true,
+			'email_2fa_enabled'         => false,
 		);
 	}
 
@@ -265,6 +274,21 @@ final class Essential_Hardening {
 		if ( ! empty( $this->options['update_notifications'] ) ) {
 			$this->module_update_notifications();
 		}
+
+		// 15. Alertas de Inicio de Sesión de Administradores (v1.4.0)
+		if ( ! empty( $this->options['admin_login_alerts'] ) ) {
+			$this->module_admin_login_alerts();
+		}
+
+		// 16. Doble Factor de Autenticación por Correo (v1.4.0)
+		if ( ! empty( $this->options['email_2fa_enabled'] ) ) {
+			$this->module_email_2fa();
+		}
+
+		// Manejador para vaciar el mini-log de seguridad desde el panel
+		if ( is_admin() ) {
+			add_action( 'admin_post_eh_clear_security_log', array( $this, 'handle_clear_security_log' ) );
+		}
 	}
 
 	/* ======================================================================
@@ -359,6 +383,7 @@ final class Essential_Hardening {
 		// Bloquear sondeo por query string (?author=1, ?author=2)
 		add_action( 'template_redirect', function (): void {
 			if ( ! is_admin() && isset( $_REQUEST['author'] ) ) {
+				$this->log_security_event( 'Anti-Recon', $this->get_client_ip(), sprintf( __( 'Escaneo de autor bloqueado: ?author=%s', 'essential-hardening' ), esc_html( (string) $_REQUEST['author'] ) ) );
 				wp_safe_redirect( home_url( '/' ), 301 );
 				exit;
 			}
@@ -472,6 +497,7 @@ final class Essential_Hardening {
 			foreach ( $targets as $target ) {
 				foreach ( $patterns as $pattern ) {
 					if ( preg_match( $pattern, $target ) ) {
+						$this->log_security_event( 'Micro-WAF', $this->get_client_ip(), sprintf( __( 'Patrón sospechoso bloqueado: %s', 'essential-hardening' ), esc_html( substr( $target, 0, 70 ) ) ) );
 						wp_die(
 							esc_html__( 'Petición bloqueada por reglas de seguridad (Micro-WAF).', 'essential-hardening' ),
 							esc_html__( 'Acceso Denegado (403)', 'essential-hardening' ),
@@ -558,6 +584,7 @@ final class Essential_Hardening {
 			// Bloqueo temporal por la duración configurada
 			set_transient( $lockout_key, 1, $lockout_duration );
 			delete_transient( $count_key );
+			$this->log_security_event( 'Fuerza Bruta', $ip, sprintf( __( 'IP bloqueada por %s tras acumular %d fallos consecutivos', 'essential-hardening' ), $this->get_human_lockout_duration( $lockout_duration ), $max_attempts ) );
 		} else {
 			// Ventana móvil de conteo por la duración configurada
 			set_transient( $count_key, $attempts, $lockout_duration );
@@ -594,6 +621,7 @@ final class Essential_Hardening {
 	public function validate_login_honeypot( $user, string $username, string $password ) {
 		// Si es una petición POST de login y el campo honeypot viene completado, es un bot
 		if ( 'POST' === ( $_SERVER['REQUEST_METHOD'] ?? '' ) && ! empty( $_POST['eh_login_company'] ) ) {
+			$this->log_security_event( 'Honeypot Anti-Bot', $this->get_client_ip(), __( 'Bot bloqueado por completar campo invisible de login', 'essential-hardening' ) );
 			// Aplicar retardo disuasivo
 			sleep( 2 );
 
@@ -893,6 +921,240 @@ final class Essential_Hardening {
 	}
 
 	/* ======================================================================
+	   MÓDULO 15: Alertas de Inicio de Sesión de Administradores (v1.4.0)
+	   ====================================================================== */
+
+	private function module_admin_login_alerts(): void {
+		add_action( 'wp_login', array( $this, 'notify_admin_login' ), 20, 2 );
+	}
+
+	public function notify_admin_login( string $user_login, $user ): void {
+		if ( ! ( $user instanceof WP_User ) || ! $user->has_cap( 'manage_options' ) ) {
+			return;
+		}
+
+		$ip         = $this->get_client_ip();
+		$user_agent = isset( $_SERVER['HTTP_USER_AGENT'] ) ? sanitize_text_field( wp_unslash( $_SERVER['HTTP_USER_AGENT'] ) ) : 'Desconocido';
+		$site_name  = wp_specialchars_decode( get_option( 'blogname' ), ENT_QUOTES );
+		$datetime   = current_time( 'Y-m-d H:i:s' );
+
+		$recipient = ! empty( $this->options['update_notify_email'] ) ? sanitize_email( $this->options['update_notify_email'] ) : $user->user_email;
+		if ( ! is_email( $recipient ) ) {
+			$recipient = get_option( 'admin_email' );
+		}
+
+		$subject = sprintf(
+			/* translators: 1: Usuario, 2: Sitio */
+			__( '[Alerta de Seguridad] Administrador conectado: %1$s en %2$s', 'essential-hardening' ),
+			$user_login,
+			$site_name
+		);
+
+		$message  = "Hola,\n\n";
+		$message .= sprintf( "Se ha iniciado sesión con cuenta de Administrador en tu sitio %s:\n\n", $site_name );
+		$message .= sprintf( "● Usuario: %s\n", $user_login );
+		$message .= sprintf( "● Fecha y Hora: %s\n", $datetime );
+		$message .= sprintf( "● Dirección IP: %s\n", $ip );
+		$message .= sprintf( "● Dispositivo / Navegador: %s\n\n", $user_agent );
+		$message .= "Si fuiste vos, podés ignorar este correo con tranquilidad.\n";
+		$message .= "Si NO reconocés este acceso, cambiá tu contraseña inmediatamente desde:\n";
+		$message .= wp_lostpassword_url() . "\n\n";
+		$message .= "--\nNotificación enviada por Essential Hardening & Security.";
+
+		wp_mail( $recipient, $subject, $message, array( 'Content-Type: text/plain; charset=UTF-8' ) );
+	}
+
+	/* ======================================================================
+	   MÓDULO 16: Doble Factor de Autenticación (2FA) por Correo (v1.4.0)
+	   ====================================================================== */
+
+	private function module_email_2fa(): void {
+		// Interceptar login tras validar credenciales para usuarios administradores
+		add_filter( 'authenticate', array( $this, 'intercept_login_for_2fa' ), 50, 3 );
+
+		// Procesar la pantalla interactiva de 2FA en wp-login.php
+		add_action( 'login_form_eh_2fa', array( $this, 'render_and_process_2fa_screen' ) );
+	}
+
+	public function intercept_login_for_2fa( $user, string $username, string $password ) {
+		// Rescate de emergencia por constante en wp-config.php
+		if ( defined( 'EH_DISABLE_2FA' ) && EH_DISABLE_2FA ) {
+			return $user;
+		}
+
+		// Solo si es un objeto de usuario válido con capacidades de administración
+		if ( ! ( $user instanceof WP_User ) || ! $user->has_cap( 'manage_options' ) ) {
+			return $user;
+		}
+
+		// Solo en peticiones POST de wp-login.php (evita interferir en CLI, Cron, REST API)
+		if ( 'POST' !== ( $_SERVER['REQUEST_METHOD'] ?? '' ) || empty( $_POST['log'] ) ) {
+			return $user;
+		}
+
+		// Si ya fue validado por 2FA, continuar
+		if ( ! empty( $_POST['eh_2fa_verified'] ) ) {
+			return $user;
+		}
+
+		$code     = sprintf( '%06d', wp_rand( 100000, 999999 ) );
+		$token    = wp_generate_password( 32, false, false );
+		$remember = ! empty( $_POST['rememberme'] );
+
+		set_transient(
+			'eh_2fa_' . $token,
+			array(
+				'user_id'  => $user->ID,
+				'hash'     => wp_hash_password( $code ),
+				'remember' => $remember,
+				'attempts' => 0,
+			),
+			10 * MINUTE_IN_SECONDS
+		);
+
+		$site_name = wp_specialchars_decode( get_option( 'blogname' ), ENT_QUOTES );
+		$subject   = sprintf( __( '[Código 2FA] Tu clave de acceso a %s', 'essential-hardening' ), $site_name );
+		$message   = sprintf(
+			"Hola %s,\n\nTu código de verificación de doble factor (2FA) para acceder a %s es:\n\n%s\n\nEste código expira en 10 minutos.\nSi no solicitaste este acceso, te sugerimos cambiar tu contraseña de inmediato.\n\n--\nEssential Hardening & Security",
+			$user->display_name,
+			$site_name,
+			$code
+		);
+
+		wp_mail( $user->user_email, $subject, $message, array( 'Content-Type: text/plain; charset=UTF-8' ) );
+
+		$redirect_url = add_query_arg(
+			array(
+				'action' => 'eh_2fa',
+				'token'  => $token,
+			),
+			wp_login_url()
+		);
+
+		wp_safe_redirect( $redirect_url );
+		exit;
+	}
+
+	public function render_and_process_2fa_screen(): void {
+		$token = isset( $_REQUEST['token'] ) ? sanitize_text_field( wp_unslash( $_REQUEST['token'] ) ) : '';
+		if ( empty( $token ) ) {
+			wp_safe_redirect( wp_login_url() );
+			exit;
+		}
+
+		$transient_key = 'eh_2fa_' . $token;
+		$data          = get_transient( $transient_key );
+
+		if ( empty( $data ) || ! is_array( $data ) ) {
+			login_header( __( 'Código Expirado', 'essential-hardening' ), '<p class="message error">' . esc_html__( 'El código de seguridad ha expirado. Por favor, inicia sesión nuevamente.', 'essential-hardening' ) . '</p>' );
+			login_footer();
+			exit;
+		}
+
+		$user = get_user_by( 'id', $data['user_id'] );
+		if ( ! ( $user instanceof WP_User ) ) {
+			wp_safe_redirect( wp_login_url() );
+			exit;
+		}
+
+		$error_message = '';
+
+		if ( 'POST' === ( $_SERVER['REQUEST_METHOD'] ?? '' ) && isset( $_POST['eh_auth_code'] ) ) {
+			check_admin_referer( 'eh_verify_2fa_action' );
+
+			$submitted_code = sanitize_text_field( wp_unslash( $_POST['eh_auth_code'] ) );
+
+			if ( wp_check_password( $submitted_code, $data['hash'] ) ) {
+				delete_transient( $transient_key );
+				wp_set_auth_cookie( $user->ID, ! empty( $data['remember'] ) );
+				do_action( 'wp_login', $user->user_login, $user );
+
+				wp_safe_redirect( admin_url() );
+				exit;
+			}
+
+			$data['attempts'] = ( $data['attempts'] ?? 0 ) + 1;
+			if ( $data['attempts'] >= 3 ) {
+				delete_transient( $transient_key );
+				$this->log_security_event( '2FA Fallido', $this->get_client_ip(), sprintf( __( '3 intentos fallidos de 2FA (usuario: %s)', 'essential-hardening' ), $user->user_login ) );
+				login_header( __( 'Acceso Bloqueado', 'essential-hardening' ), '<p class="message error">' . esc_html__( 'Demasiados intentos fallidos del código de seguridad. Intenta iniciar sesión de nuevo.', 'essential-hardening' ) . '</p>' );
+				login_footer();
+				exit;
+			}
+
+			set_transient( $transient_key, $data, 10 * MINUTE_IN_SECONDS );
+			$error_message = sprintf( esc_html__( 'Código incorrecto. Le quedan %d intento(s).', 'essential-hardening' ), 3 - $data['attempts'] );
+		}
+
+		$masked_email = substr( $user->user_email, 0, 3 ) . '***@' . substr( strrchr( $user->user_email, '@' ), 1 );
+
+		login_header(
+			__( 'Doble Factor de Autenticación', 'essential-hardening' ),
+			$error_message ? '<p class="message error">' . esc_html( $error_message ) . '</p>' : '<p class="message info">' . sprintf( esc_html__( 'Se ha enviado un código de 6 dígitos a %s. Ingréselo para acceder.', 'essential-hardening' ), '<strong>' . esc_html( $masked_email ) . '</strong>' ) . '</p>'
+		);
+		?>
+		<form name="eh_2fa_form" id="loginform" method="post" action="<?php echo esc_url( add_query_arg( array( 'action' => 'eh_2fa', 'token' => $token ), wp_login_url() ) ); ?>">
+			<?php wp_nonce_field( 'eh_verify_2fa_action' ); ?>
+			<p>
+				<label for="eh_auth_code"><?php esc_html_e( 'Código de 6 dígitos:', 'essential-hardening' ); ?></label>
+				<input type="text" name="eh_auth_code" id="eh_auth_code" class="input" value="" size="6" maxlength="6" pattern="[0-9]{6}" inputmode="numeric" autocomplete="one-time-code" required autofocus style="font-size: 24px; text-align: center; letter-spacing: 6px; font-weight: bold;" />
+			</p>
+			<p class="submit" style="margin-top: 20px;">
+				<input type="submit" name="wp-submit" id="wp-submit" class="button button-primary button-large" value="<?php esc_attr_e( 'Verificar e Iniciar Sesión', 'essential-hardening' ); ?>" style="width: 100%;" />
+			</p>
+		</form>
+		<p id="nav" style="text-align: center;">
+			<a href="<?php echo esc_url( wp_login_url() ); ?>">&larr; <?php esc_html_e( 'Volver a la pantalla de inicio de sesión', 'essential-hardening' ); ?></a>
+		</p>
+		<?php
+		login_footer();
+		exit;
+	}
+
+	/* ======================================================================
+	   MÓDULO 17: Mini-Registro en Vivo de Eventos de Seguridad (v1.4.0)
+	   ====================================================================== */
+
+	public function log_security_event( string $type, string $ip, string $detail ): void {
+		if ( empty( $this->options['security_event_log'] ) ) {
+			return;
+		}
+
+		$events = get_option( 'eh_security_events_log', array() );
+		if ( ! is_array( $events ) ) {
+			$events = array();
+		}
+
+		array_unshift(
+			$events,
+			array(
+				'timestamp' => current_time( 'timestamp' ),
+				'type'      => $type,
+				'ip'        => $ip,
+				'detail'    => $detail,
+			)
+		);
+
+		if ( count( $events ) > self::MAX_EVENT_LOG_ENTRIES ) {
+			$events = array_slice( $events, 0, self::MAX_EVENT_LOG_ENTRIES );
+		}
+
+		update_option( 'eh_security_events_log', $events, false );
+	}
+
+	public function handle_clear_security_log(): void {
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_die( esc_html__( 'Acceso no autorizado.', 'essential-hardening' ) );
+		}
+
+		check_admin_referer( 'eh_clear_log_nonce' );
+		delete_option( 'eh_security_events_log' );
+
+		wp_safe_redirect( add_query_arg( array( 'page' => 'essential-hardening', 'eh_log_cleared' => '1' ), admin_url( 'options-general.php' ) ) );
+		exit;
+	}
+
+	/* ======================================================================
 	   PANEL DE CONTROL EN WP-ADMIN (Ajustes > Hardening)
 	   ====================================================================== */
 
@@ -965,6 +1227,10 @@ final class Essential_Hardening {
 		$boolean_options = array_filter( $options, 'is_bool' );
 		$active_count    = count( array_filter( $boolean_options ) );
 		$total_count     = count( array_filter( $this->get_default_settings(), 'is_bool' ) );
+		$recent_events   = get_option( 'eh_security_events_log', array() );
+		if ( ! is_array( $recent_events ) ) {
+			$recent_events = array();
+		}
 
 		if ( isset( $_GET['eh_email'] ) ) {
 			if ( 'sent' === $_GET['eh_email'] ) {
@@ -973,6 +1239,10 @@ final class Essential_Hardening {
 			} elseif ( 'failed' === $_GET['eh_email'] ) {
 				echo '<div class="notice notice-error is-dismissible" style="margin-top: 15px;"><p>' . esc_html__( 'No se pudo enviar el correo de prueba. Verifique la configuración de correo de su servidor.', 'essential-hardening' ) . '</p></div>';
 			}
+		}
+
+		if ( isset( $_GET['eh_log_cleared'] ) ) {
+			echo '<div class="notice notice-success is-dismissible" style="margin-top: 15px;"><p>' . esc_html__( 'Registro de eventos de seguridad vaciado con éxito.', 'essential-hardening' ) . '</p></div>';
 		}
 		?>
 		<div class="wrap" id="eh-settings-wrap">
@@ -1320,6 +1590,33 @@ final class Essential_Hardening {
 								<p class="eh-item-desc"><?php esc_html_e( 'Define DISALLOW_FILE_EDIT para deshabilitar el editor web de temas y plugins, impidiendo la inyección de webshells si una sesión se compromete.', 'essential-hardening' ); ?></p>
 							</div>
 						</div>
+
+						<!-- Alertas de Acceso de Administrador -->
+						<div class="eh-item">
+							<input type="checkbox" id="eh_admin_login_alerts" name="<?php echo esc_attr( self::OPTION_NAME ); ?>[admin_login_alerts]" value="1" <?php checked( $options['admin_login_alerts'] ); ?>>
+							<div class="eh-item-body">
+								<div class="eh-item-title-row">
+									<label for="eh_admin_login_alerts" class="eh-item-label"><?php esc_html_e( 'Alertas de Acceso de Administradores', 'essential-hardening' ); ?></label>
+									<span class="eh-tag eh-tag-access"><?php esc_html_e( 'Notificación', 'essential-hardening' ); ?></span>
+								</div>
+								<p class="eh-item-desc"><?php esc_html_e( 'Envía un aviso inmediato por correo electrónico cada vez que un usuario con rol de Administrador inicia sesión con éxito, detallando IP, fecha, hora y navegador.', 'essential-hardening' ); ?></p>
+							</div>
+						</div>
+
+						<!-- Autenticación en Dos Pasos (2FA) por Correo -->
+						<div class="eh-item">
+							<input type="checkbox" id="eh_email_2fa_enabled" name="<?php echo esc_attr( self::OPTION_NAME ); ?>[email_2fa_enabled]" value="1" <?php checked( $options['email_2fa_enabled'] ); ?>>
+							<div class="eh-item-body">
+								<div class="eh-item-title-row">
+									<label for="eh_email_2fa_enabled" class="eh-item-label"><?php esc_html_e( 'Doble Factor de Autenticación (2FA) por Correo', 'essential-hardening' ); ?></label>
+									<span class="eh-tag eh-tag-firewall"><?php esc_html_e( '2FA OTP', 'essential-hardening' ); ?></span>
+								</div>
+								<p class="eh-item-desc"><?php esc_html_e( 'Exige un código numérico temporal de 6 dígitos enviado al correo del administrador tras ingresar usuario y contraseña. Bloquea el acceso tras 3 fallos.', 'essential-hardening' ); ?></p>
+								<p style="margin: 6px 0 0; font-size: 11px; color: #8a4b08;">
+									<?php esc_html_e( '⚠️ Rescate de emergencia: si tu servidor no puede enviar correos, puedes desactivarlo añadiendo define(\'EH_DISABLE_2FA\', true); en wp-config.php.', 'essential-hardening' ); ?>
+								</p>
+							</div>
+						</div>
 					</div>
 				</div>
 
@@ -1446,6 +1743,90 @@ final class Essential_Hardening {
 							</div>
 						</div>
 					</div>
+				</div>
+
+				<!-- CATEGORÍA 6: Auditoría & Registro en Vivo de Ataques -->
+				<div class="eh-card">
+					<div class="eh-card-header" style="justify-content: space-between;">
+						<div style="display: flex; align-items: center; gap: 12px;">
+							<span class="eh-card-icon">📋</span>
+							<div>
+								<h2 class="eh-card-title"><?php esc_html_e( '6. Auditoría y Registro en Vivo de Ataques Neutralizados', 'essential-hardening' ); ?></h2>
+								<p class="eh-card-desc"><?php esc_html_e( 'Monitorea en tiempo real los últimos incidentes bloqueados por el cortafuegos, trampas honeypot y rate-limiting.', 'essential-hardening' ); ?></p>
+							</div>
+						</div>
+						<?php if ( ! empty( $recent_events ) ) : ?>
+							<div>
+								<a href="<?php echo esc_url( wp_nonce_url( admin_url( 'admin-post.php?action=eh_clear_security_log' ), 'eh_clear_log_nonce' ) ); ?>" class="button button-secondary" onclick="return confirm('<?php echo esc_js( __( '¿Seguro que deseas vaciar el registro de eventos?', 'essential-hardening' ) ); ?>');" style="font-size: 12px; color: #b32d2e;">
+									<?php esc_html_e( '🗑️ Vaciar Registro', 'essential-hardening' ); ?>
+								</a>
+							</div>
+						<?php endif; ?>
+					</div>
+
+					<div class="eh-grid" style="margin-bottom: 16px;">
+						<div class="eh-item">
+							<input type="checkbox" id="eh_security_event_log" name="<?php echo esc_attr( self::OPTION_NAME ); ?>[security_event_log]" value="1" <?php checked( $options['security_event_log'] ); ?>>
+							<div class="eh-item-body">
+								<div class="eh-item-title-row">
+									<label for="eh_security_event_log" class="eh-item-label"><?php esc_html_e( 'Activar Registro de Eventos (Historial rotativo de 25 entradas)', 'essential-hardening' ); ?></label>
+									<span class="eh-tag eh-tag-firewall"><?php esc_html_e( 'Sin impacto en BD', 'essential-hardening' ); ?></span>
+								</div>
+								<p class="eh-item-desc"><?php esc_html_e( 'Guarda de forma rotativa y ultraligera los últimos 25 intentos neutralizados (Micro-WAF, fuerza bruta, trampas bot y sondeo de usuarios) para diagnóstico visual sin sobrecargar la base de datos.', 'essential-hardening' ); ?></p>
+							</div>
+						</div>
+					</div>
+
+					<!-- Tabla de Eventos Recientes -->
+					<?php if ( empty( $recent_events ) ) : ?>
+						<div style="background: #f6f7f7; border: 1px dashed #c3c4c7; border-radius: 6px; padding: 20px; text-align: center; color: #50575e; font-size: 13px;">
+							<p style="margin: 0; font-weight: 500;">🛡️ <?php esc_html_e( 'No hay incidentes de seguridad registrados recientemente.', 'essential-hardening' ); ?></p>
+							<p style="margin: 5px 0 0; font-size: 12px; color: #646970;"><?php esc_html_e( 'Cuando el WAF o los escudos de acceso bloqueen un intento sospechoso, aparecerá detallado aquí con fecha, hora e IP.', 'essential-hardening' ); ?></p>
+						</div>
+					<?php else : ?>
+						<div style="overflow-x: auto; border: 1px solid #dcdcde; border-radius: 6px;">
+							<table class="wp-list-table widefat striped" style="border: none;">
+								<thead>
+									<tr>
+										<th style="font-weight: 600; font-size: 12px; width: 140px;"><?php esc_html_e( 'Fecha / Hora', 'essential-hardening' ); ?></th>
+										<th style="font-weight: 600; font-size: 12px; width: 120px;"><?php esc_html_e( 'Escudo', 'essential-hardening' ); ?></th>
+										<th style="font-weight: 600; font-size: 12px; width: 130px;"><?php esc_html_e( 'Dirección IP', 'essential-hardening' ); ?></th>
+										<th style="font-weight: 600; font-size: 12px;"><?php esc_html_e( 'Detalle del Incidente', 'essential-hardening' ); ?></th>
+									</tr>
+								</thead>
+								<tbody>
+									<?php foreach ( $recent_events as $event ) : ?>
+										<tr>
+											<td style="font-size: 12px; color: #50575e; white-space: nowrap;">
+												<?php echo esc_html( date_i18n( 'd/m/Y H:i:s', $event['timestamp'] ?? time() ) ); ?>
+											</td>
+											<td>
+												<?php
+												$type_class = 'eh-tag-firewall';
+												if ( 'Fuerza Bruta' === ( $event['type'] ?? '' ) || '2FA Fallido' === ( $event['type'] ?? '' ) ) {
+													$type_class = 'eh-tag-access';
+												} elseif ( 'Honeypot' === ( $event['type'] ?? '' ) ) {
+													$type_class = 'eh-tag-spam';
+												} elseif ( 'Anti-Recon' === ( $event['type'] ?? '' ) ) {
+													$type_class = 'eh-tag-privacy';
+												}
+												?>
+												<span class="eh-tag <?php echo esc_attr( $type_class ); ?>">
+													<?php echo esc_html( $event['type'] ?? 'Seguridad' ); ?>
+												</span>
+											</td>
+											<td style="font-size: 12px; font-family: monospace;">
+												<strong><?php echo esc_html( $event['ip'] ?? '0.0.0.0' ); ?></strong>
+											</td>
+											<td style="font-size: 12px; color: #1d2327;">
+												<code><?php echo esc_html( $event['detail'] ?? '' ); ?></code>
+											</td>
+										</tr>
+									<?php endforeach; ?>
+								</tbody>
+							</table>
+						</div>
+					<?php endif; ?>
 				</div>
 
 				<!-- Barra Inferior de Guardado -->

@@ -2,7 +2,7 @@
 
 Suite modular, ultraligera y sin dependencias externas para el endurecimiento y seguridad perimetral integral de sitios WordPress.
 
-- **Versión:** 1.3.0
+- **Versión:** 1.4.0
 - **Licencia:** GPL-2.0-or-later
 - **Compatibilidad:** WordPress 5.8+ | PHP 7.4 - 8.3+
 
@@ -15,10 +15,11 @@ El plugin **Essential Hardening & Security** está diseñado bajo los principios
 - **Sin impacto en rendimiento:** ejecuta únicamente hooks nativos de WordPress en memoria con tiempo de procesamiento sub-milisegundo.
 - **Portabilidad universal:** desacoplado por completo de cualquier tema o hosting. Funciona tanto como plugin estándar en `wp-content/plugins/` o como plugin obligatorio en `wp-content/mu-plugins/`.
 - **Persistencia limpia:** guarda un único registro en la tabla `wp_options` sin crear tablas adicionales.
+- **Rescate de emergencia para 2FA:** configurable mediante `EH_DISABLE_2FA` en `wp-config.php`.
 
 ---
 
-## 2. Los 14 Módulos de Protección
+## 2. Los 17 Módulos de Protección y Auditoría
 
 ### 2.1. Micro-WAF / Cortafuegos de Peticiones y Query Strings
 Inspecciona tanto la cadena de consulta cruda (`QUERY_STRING`) como la decodificada en cada petición HTTP antes de que los componentes del núcleo o plugins comiencen su procesamiento:
@@ -104,6 +105,26 @@ Monitoreo preventivo y proactivo del ecosistema del sitio:
 - **Control anti-saturación:** Emplea una firma hash en memoria para emitir un único correo diario por grupo de actualizaciones, evitando el bombardeo continuo de mensajes.
 - **Enrutamiento de auto-actualizaciones:** Garantiza que los informes de auto-actualizaciones exitosas ejecutadas por WordPress se entreguen a la casilla configurada.
 
+### 2.15. Alertas de Inicio de Sesión de Administradores
+Supervisión activa de accesos privilegiados al panel de control:
+- **Hook de login:** Se engancha en `wp_login` y evalúa si el usuario autenticado posee la capacidad `manage_options`.
+- **Información contextual:** Envía un correo electrónico con nombre de usuario, fecha y hora local, dirección IP y el `HTTP_USER_AGENT` del navegador.
+- **Detección temprana:** Permite al administrador enterarse instantáneamente si alguien ha utilizado sus credenciales desde una ubicación geográfica o dispositivo inusual.
+
+### 2.16. Doble Factor de Autenticación (2FA) por Correo
+Protección en dos pasos nativa y sin aplicaciones externas:
+- **Flujo interactivo:** Al verificar la contraseña en `wp-login.php`, el plugin retiene el login y genera un código criptográfico de 6 dígitos con validez de 10 minutos almacenado como transient encriptado.
+- **Entrega segura:** Envía el código al correo del usuario y redirige a la pantalla interactiva de verificación en `wp-login.php?action=eh_2fa`.
+- **Límite de intentos:** Permite un máximo de 3 intentos del código; al tercer fallo, el transient se destruye y el evento se registra como intento no autorizado.
+- **Bypass de emergencia:** En caso de fallas de correo en el servidor, un administrador con acceso FTP o cPanel puede desactivar temporalmente el 2FA agregando `define( 'EH_DISABLE_2FA', true );` en `wp-config.php`.
+- **Valor por defecto:** Deshabilitado (`false`) para activación opcional.
+
+### 2.17. Registro en Vivo de Ataques Neutralizados (Mini-Log)
+Visibilidad en tiempo real de los intentos maliciosos bloqueados:
+- **Capacidad rotativa:** Almacena de forma circular las últimas 25 incidencias neutralizadas en la opción `eh_security_events_log` con `autoload = false`.
+- **Eventos registrados:** Bloqueos del Micro-WAF (inyección SQL, RCE, traversal), trampas honeypot disparadas, rate limiting de fuerza bruta, fallos de código 2FA y sondeo de usuarios por query string.
+- **Interfaz administrativa:** Card dedicada con tabla clasificada por etiquetas de color, fecha/hora formateada, IP y detalle técnico, junto con botón para vaciar el historial.
+
 ---
 
 ## 3. Configuración en Base de Datos
@@ -130,8 +151,13 @@ El plugin almacena sus preferencias en una única entrada en `wp_options`:
       'throttle_lockout_duration' => 900,
       'update_notifications'      => true,
       'update_notify_email'       => '',
+      'admin_login_alerts'        => true,
+      'security_event_log'        => true,
+      'email_2fa_enabled'         => false,
   )
   ```
+
+El registro de incidencias neutralizadas se guarda de forma separada en `eh_security_events_log` (máximo 25 elementos, con `autoload = false` para no impactar consultas habituales).
 
 ---
 

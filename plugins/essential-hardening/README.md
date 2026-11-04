@@ -2,13 +2,13 @@
 
 Suite ultraligera, modular y sin dependencias para el endurecimiento (*hardening*) y protección perimetral de cualquier instalación WordPress. Diseñada para proteger portales institucionales, blogs, tiendas o sitios corporativos con cero sobrecarga técnica y sin tablas adicionales en base de datos.
 
-- **Versión:** 1.3.0
+- **Versión:** 1.4.0
 - **Licencia:** GPL-2.0-or-later
 - **Dependencias:** Cero (PHP nativo + Hooks de WordPress)
 
 ---
 
-## 🛡️ Los 14 Escudos de Seguridad
+## 🛡️ Los 17 Escudos y Herramientas de Seguridad
 
 ### 1. Cortafuegos de Peticiones y Query Strings (Micro-WAF)
 - Inspecciona en tiempo real las cadenas de consulta (`$_SERVER['QUERY_STRING']` y `$_SERVER['REQUEST_URI']`).
@@ -82,6 +82,23 @@ Suite ultraligera, modular y sin dependencias para el endurecimiento (*hardening
 - Filtro inteligente anti-spam: envía solo un resumen consolidado diario evitando la saturación de correos que causan otros plugins como Wordfence.
 - Enruta las notificaciones automáticas de WordPress cuando se completan auto-actualizaciones exitosas al email configurado.
 
+### 15. Alertas de Inicio de Sesión de Administradores
+- Envía una notificación inmediata por correo electrónico cada vez que un usuario con privilegios de Administrador (`manage_options`) inicia sesión en el sitio.
+- Incluye nombre de usuario, fecha y hora local, dirección IP y el agente de usuario (navegador y sistema operativo).
+- Permite detectar de inmediato accesos no autorizados o credenciales filtradas.
+
+### 16. Doble Factor de Autenticación (2FA) por Correo Electrónico
+- Sistema 2FA nativo y sin dependencias: genera un código numérico aleatorio de 6 dígitos con validez de 10 minutos enviado al correo del administrador tras verificar la contraseña.
+- Bloquea la sesión al tercer intento fallido del código para mitigar ataques por adivinación.
+- Incluye mecanismo de rescate de emergencia: si el servidor no puede enviar correos temporalmente, puede desactivarse añadiendo `define( 'EH_DISABLE_2FA', true );` en `wp-config.php`.
+- **Deshabilitado por defecto** para activarlo voluntariamente según la infraestructura de correo de cada sitio.
+
+### 17. Registro en Vivo de Ataques Neutralizados (Mini-Log de 25 Eventos)
+- Panel de control visual en `wp-admin` que muestra los últimos 25 incidentes bloqueados en tiempo real.
+- Registra bloqueos del Micro-WAF, disparos de la trampa honeypot, bloqueos por fuerza bruta, intentos fallidos de 2FA y sondeo de usuarios.
+- Almacenamiento circular ultraligero en base de datos (`eh_security_events_log`) con `autoload = false`, garantizando cero impacto en el rendimiento o crecimiento de la base de datos.
+- Incluye botón para vaciar el historial con confirmación interactiva.
+
 ---
 
 ## 🚀 Instalación en Cualquier Proyecto WordPress
@@ -90,7 +107,7 @@ Suite ultraligera, modular y sin dependencias para el endurecimiento (*hardening
 1. Copia la carpeta `essential-hardening` dentro de `wp-content/plugins/`.
 2. Ve a **Plugins > Plugins Instalados** en tu panel de WordPress.
 3. Haz clic en **Activar**.
-4. Puedes ajustar o activar/desactivar cualquiera de los 14 escudos en **Ajustes > Seguridad Esencial**.
+4. Puedes ajustar o activar/desactivar cualquiera de los 17 escudos en **Ajustes > Seguridad Esencial**.
 
 ### Opción B: Como Plugin Obligatorio (*Must-Use*)
 1. Copia el archivo `essential-hardening.php` o crea un cargador en `wp-content/mu-plugins/`.
