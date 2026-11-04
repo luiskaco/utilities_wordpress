@@ -2,7 +2,7 @@
 
 Suite modular, ultraligera y sin dependencias externas para el endurecimiento y seguridad perimetral integral de sitios WordPress.
 
-- **Versión:** 1.2.0
+- **Versión:** 1.3.0
 - **Licencia:** GPL-2.0-or-later
 - **Compatibilidad:** WordPress 5.8+ | PHP 7.4 - 8.3+
 
@@ -18,7 +18,7 @@ El plugin **Essential Hardening & Security** está diseñado bajo los principios
 
 ---
 
-## 2. Los 13 Módulos de Protección
+## 2. Los 14 Módulos de Protección
 
 ### 2.1. Micro-WAF / Cortafuegos de Peticiones y Query Strings
 Inspecciona tanto la cadena de consulta cruda (`QUERY_STRING`) como la decodificada en cada petición HTTP antes de que los componentes del núcleo o plugins comiencen su procesamiento:
@@ -97,6 +97,13 @@ Protección transparente contra bots y atacantes automatizados en `/wp-login.php
 - **Detección inmediata:** Los bots automatizados que rastrean y autocompletan inputs lo llenan, disparando un bloqueo inmediato con **HTTP 403 Forbidden** y retardo disuasivo de 2 segundos.
 - **Sin molestias:** Los usuarios humanos no ven el campo ni deben resolver captchas visuales. Cero dependencias y privacidad total.
 
+### 2.14. Alertas de Actualizaciones Pendientes y Completadas
+Monitoreo preventivo y proactivo del ecosistema del sitio:
+- **Chequeo diario en segundo plano:** Evalúa diariamente si existen versiones pendientes para plugins, temas o el núcleo de WordPress.
+- **Reporte consolidado por correo:** Si se detectan actualizaciones disponibles, envía un correo detallado al administrador indicando los nombres de componentes, versiones actuales y nuevas, más el enlace directo de actualización.
+- **Control anti-saturación:** Emplea una firma hash en memoria para emitir un único correo diario por grupo de actualizaciones, evitando el bombardeo continuo de mensajes.
+- **Enrutamiento de auto-actualizaciones:** Garantiza que los informes de auto-actualizaciones exitosas ejecutadas por WordPress se entreguen a la casilla configurada.
+
 ---
 
 ## 3. Configuración en Base de Datos
@@ -121,6 +128,8 @@ El plugin almacena sus preferencias en una única entrada en `wp_options`:
       'login_honeypot'            => true,
       'throttle_max_attempts'     => 5,
       'throttle_lockout_duration' => 900,
+      'update_notifications'      => true,
+      'update_notify_email'       => '',
   )
   ```
 

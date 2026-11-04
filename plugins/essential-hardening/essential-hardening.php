@@ -3,7 +3,7 @@
  * Plugin Name:       Essential Hardening & Security
  * Plugin URI:        https://github.com/luiskaco/utilities_wordpress
  * Description:       Suite ligera, modular y de rendimiento cero para hardening en WordPress. Cortafuegos Micro-WAF, mitigación de fuerza bruta, protección de uploads, bloqueo de enumeración de usuarios, desactivación total de comentarios y spam, cabeceras HTTP defensivas y anonimización de huellas del CMS.
- * Version:           1.2.0
+ * Version:           1.3.0
  * Requires at least: 5.8
  * Requires PHP:      7.4
  * Author:            Web Security Tools
@@ -23,7 +23,7 @@ final class Essential_Hardening {
 	/**
 	 * Versión del plugin.
 	 */
-	public const VERSION = '1.2.0';
+	public const VERSION = '1.3.0';
 
 	/**
 	 * Clave de opciones en la base de datos.
@@ -163,9 +163,12 @@ final class Essential_Hardening {
 			'clean_head_meta'         => true,
 			'hide_author_body_class'  => true,
 			// Módulos v1.2.0 (Anti-Bot y Rate Limiting Configurable)
-			'login_honeypot'          => true,
-			'throttle_max_attempts'   => 5,
+			'login_honeypot'            => true,
+			'throttle_max_attempts'     => 5,
 			'throttle_lockout_duration' => 900,
+			// Módulos v1.3.0 (Notificaciones de Actualizaciones)
+			'update_notifications'      => true,
+			'update_notify_email'       => '',
 		);
 	}
 
@@ -256,6 +259,11 @@ final class Essential_Hardening {
 		// 13. Honeypot Anti-Bot en pantalla de login (v1.2.0)
 		if ( ! empty( $this->options['login_honeypot'] ) ) {
 			$this->module_login_honeypot();
+		}
+
+		// 14. Alertas de Actualizaciones Pendientes y Completadas (v1.3.0)
+		if ( ! empty( $this->options['update_notifications'] ) ) {
+			$this->module_update_notifications();
 		}
 	}
 
@@ -679,6 +687,212 @@ final class Essential_Hardening {
 	}
 
 	/* ======================================================================
+	   MÓDULO 14: Notificaciones de Actualizaciones Pendientes y Completadas (v1.3.0)
+	   ====================================================================== */
+
+	private function module_update_notifications(): void {
+		// Programar evento cron diario si no existe
+		if ( ! wp_next_scheduled( 'eh_daily_update_check_cron' ) ) {
+			wp_schedule_event( time() + HOUR_IN_SECONDS, 'daily', 'eh_daily_update_check_cron' );
+		}
+
+		add_action( 'eh_daily_update_check_cron', array( $this, 'check_and_notify_updates' ) );
+
+		// Enrutar correos de auto-actualización de WordPress al email configurado
+		add_filter( 'auto_plugin_theme_update_email', array( $this, 'filter_auto_update_email' ), 10, 4 );
+		add_filter( 'auto_core_update_email', array( $this, 'filter_auto_core_update_email' ), 10, 4 );
+
+		// Procesar envío de correo de prueba manual desde el panel
+		if ( is_admin() ) {
+			add_action( 'admin_post_eh_test_update_email', array( $this, 'handle_test_update_email' ) );
+		}
+	}
+
+	public function filter_auto_update_email( array $email, string $type, array $successful_updates, array $failed_updates ): array {
+		if ( ! empty( $this->options['update_notifications'] ) && ! empty( $this->options['update_notify_email'] ) ) {
+			if ( is_email( $this->options['update_notify_email'] ) ) {
+				$email['to'] = $this->options['update_notify_email'];
+			}
+		}
+		return $email;
+	}
+
+	public function filter_auto_core_update_email( array $email, string $type, $core_update, $result ): array {
+		if ( ! empty( $this->options['update_notifications'] ) && ! empty( $this->options['update_notify_email'] ) ) {
+			if ( is_email( $this->options['update_notify_email'] ) ) {
+				$email['to'] = $this->options['update_notify_email'];
+			}
+		}
+		return $email;
+	}
+
+	public function handle_test_update_email(): void {
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_die( esc_html__( 'Acceso no autorizado.', 'essential-hardening' ) );
+		}
+
+		check_admin_referer( 'eh_test_email_nonce' );
+
+		$dummy_plugins = array(
+			array(
+				'name'            => 'Essential Hardening & Security (Prueba)',
+				'current_version' => self::VERSION,
+				'new_version'     => self::VERSION,
+			),
+		);
+
+		$sent = $this->send_update_notification_email( $dummy_plugins, array(), false, '', true );
+
+		$redirect_url = add_query_arg(
+			array(
+				'page'     => 'essential-hardening',
+				'eh_email' => $sent ? 'sent' : 'failed',
+			),
+			admin_url( 'options-general.php' )
+		);
+
+		wp_safe_redirect( $redirect_url );
+		exit;
+	}
+
+	public function check_and_notify_updates(): void {
+		if ( empty( $this->options['update_notifications'] ) ) {
+			return;
+		}
+
+		if ( ! function_exists( 'get_plugin_data' ) ) {
+			require_once ABSPATH . 'wp-admin/includes/plugin.php';
+		}
+		if ( ! function_exists( 'wp_get_update_data' ) ) {
+			require_once ABSPATH . 'wp-admin/includes/update.php';
+		}
+
+		wp_update_plugins();
+		wp_update_themes();
+
+		$pending_plugins = array();
+		$update_plugins  = get_site_transient( 'update_plugins' );
+		if ( ! empty( $update_plugins->response ) && is_array( $update_plugins->response ) ) {
+			foreach ( $update_plugins->response as $plugin_file => $plugin_data ) {
+				$plugin_full_path = WP_PLUGIN_DIR . '/' . $plugin_file;
+				$current_version  = '';
+				$plugin_name      = $plugin_file;
+
+				if ( file_exists( $plugin_full_path ) ) {
+					$info = get_plugin_data( $plugin_full_path, false, false );
+					$plugin_name     = ! empty( $info['Name'] ) ? $info['Name'] : $plugin_file;
+					$current_version = ! empty( $info['Version'] ) ? $info['Version'] : '';
+				}
+
+				$new_version = is_object( $plugin_data ) && isset( $plugin_data->new_version ) ? $plugin_data->new_version : ( is_array( $plugin_data ) && isset( $plugin_data['new_version'] ) ? $plugin_data['new_version'] : '' );
+
+				$pending_plugins[] = array(
+					'name'            => $plugin_name,
+					'current_version' => $current_version,
+					'new_version'     => $new_version,
+				);
+			}
+		}
+
+		$pending_themes = array();
+		$update_themes  = get_site_transient( 'update_themes' );
+		if ( ! empty( $update_themes->response ) && is_array( $update_themes->response ) ) {
+			foreach ( $update_themes->response as $theme_slug => $theme_data ) {
+				$theme           = wp_get_theme( $theme_slug );
+				$theme_name      = $theme->exists() ? $theme->get( 'Name' ) : $theme_slug;
+				$current_version = $theme->exists() ? $theme->get( 'Version' ) : '';
+				$new_version     = is_object( $theme_data ) && isset( $theme_data->new_version ) ? $theme_data->new_version : ( is_array( $theme_data ) && isset( $theme_data['new_version'] ) ? $theme_data['new_version'] : '' );
+
+				$pending_themes[] = array(
+					'name'            => $theme_name,
+					'current_version' => $current_version,
+					'new_version'     => $new_version,
+				);
+			}
+		}
+
+		$pending_core = false;
+		$core_version = '';
+		$update_core  = get_site_transient( 'update_core' );
+		if ( ! empty( $update_core->updates ) && is_array( $update_core->updates ) ) {
+			foreach ( $update_core->updates as $core_update ) {
+				if ( isset( $core_update->response ) && 'upgrade' === $core_update->response ) {
+					$pending_core = true;
+					$core_version = $core_update->current;
+					break;
+				}
+			}
+		}
+
+		if ( empty( $pending_plugins ) && empty( $pending_themes ) && ! $pending_core ) {
+			return;
+		}
+
+		$current_hash = md5( wp_json_encode( array( $pending_plugins, $pending_themes, $pending_core ) ) );
+		$last_hash    = get_transient( 'eh_last_update_notice_hash' );
+		if ( $current_hash === $last_hash ) {
+			return;
+		}
+
+		$this->send_update_notification_email( $pending_plugins, $pending_themes, $pending_core, $core_version );
+		set_transient( 'eh_last_update_notice_hash', $current_hash, 24 * HOUR_IN_SECONDS );
+	}
+
+	private function send_update_notification_email( array $plugins, array $themes, bool $core, string $core_version, bool $is_test = false ): bool {
+		$recipient = ! empty( $this->options['update_notify_email'] ) ? sanitize_email( $this->options['update_notify_email'] ) : get_option( 'admin_email' );
+		if ( ! is_email( $recipient ) ) {
+			$recipient = get_option( 'admin_email' );
+		}
+
+		$site_name = wp_specialchars_decode( get_option( 'blogname' ), ENT_QUOTES );
+		$site_url  = home_url();
+		$admin_url = admin_url( 'update-core.php' );
+
+		$subject = sprintf(
+			/* translators: %s: Nombre del sitio */
+			__( '[Seguridad] Actualizaciones pendientes en %s', 'essential-hardening' ),
+			$site_name
+		);
+
+		if ( $is_test ) {
+			$subject = '[Prueba] ' . $subject;
+		}
+
+		$message  = "Hola,\n\n";
+		$message .= sprintf( "Essential Hardening ha detectado actualizaciones de seguridad pendientes en tu sitio web %s (%s):\n\n", $site_name, $site_url );
+
+		if ( $core ) {
+			$message .= "● NÚCLEO DE WORDPRESS:\n";
+			$message .= sprintf( "  Nueva versión disponible: WordPress %s\n\n", $core_version );
+		}
+
+		if ( ! empty( $plugins ) ) {
+			$message .= "● PLUGINS PENDIENTES DE ACTUALIZAR (" . count( $plugins ) . "):\n";
+			foreach ( $plugins as $p ) {
+				$message .= sprintf( "  - %s: versión actual %s → nueva versión %s\n", $p['name'], $p['current_version'], $p['new_version'] );
+			}
+			$message .= "\n";
+		}
+
+		if ( ! empty( $themes ) ) {
+			$message .= "● TEMAS PENDIENTES DE ACTUALIZAR (" . count( $themes ) . "):\n";
+			foreach ( $themes as $t ) {
+				$message .= sprintf( "  - %s: versión actual %s → nueva versión %s\n", $t['name'], $t['current_version'], $t['new_version'] );
+			}
+			$message .= "\n";
+		}
+
+		$message .= "Mantener los plugins y temas al día es la principal medida para evitar intrusiones y vulnerabilidades en WordPress.\n\n";
+		$message .= "Podés aplicar las actualizaciones directamente desde tu panel de administración:\n";
+		$message .= $admin_url . "\n\n";
+		$message .= "--\nNotificación enviada por Essential Hardening & Security.";
+
+		$headers = array( 'Content-Type: text/plain; charset=UTF-8' );
+
+		return wp_mail( $recipient, $subject, $message, $headers );
+	}
+
+	/* ======================================================================
 	   PANEL DE CONTROL EN WP-ADMIN (Ajustes > Hardening)
 	   ====================================================================== */
 
@@ -730,6 +944,9 @@ final class Essential_Hardening {
 			$sanitized['throttle_lockout_duration'] = 900;
 		}
 
+		// Sanitizar email para notificaciones
+		$sanitized['update_notify_email'] = ! empty( $input['update_notify_email'] ) ? sanitize_email( $input['update_notify_email'] ) : '';
+
 		return $sanitized;
 	}
 
@@ -748,6 +965,15 @@ final class Essential_Hardening {
 		$boolean_options = array_filter( $options, 'is_bool' );
 		$active_count    = count( array_filter( $boolean_options ) );
 		$total_count     = count( array_filter( $this->get_default_settings(), 'is_bool' ) );
+
+		if ( isset( $_GET['eh_email'] ) ) {
+			if ( 'sent' === $_GET['eh_email'] ) {
+				$recipient = ! empty( $options['update_notify_email'] ) ? $options['update_notify_email'] : get_option( 'admin_email' );
+				echo '<div class="notice notice-success is-dismissible" style="margin-top: 15px;"><p>' . sprintf( esc_html__( 'Correo de prueba enviado con éxito a %s.', 'essential-hardening' ), '<strong>' . esc_html( $recipient ) . '</strong>' ) . '</p></div>';
+			} elseif ( 'failed' === $_GET['eh_email'] ) {
+				echo '<div class="notice notice-error is-dismissible" style="margin-top: 15px;"><p>' . esc_html__( 'No se pudo enviar el correo de prueba. Verifique la configuración de correo de su servidor.', 'essential-hardening' ) . '</p></div>';
+			}
+		}
 		?>
 		<div class="wrap" id="eh-settings-wrap">
 			<style>
@@ -1178,6 +1404,45 @@ final class Essential_Hardening {
 									<span class="eh-tag eh-tag-spam"><?php esc_html_e( 'Anti-Spam Total', 'essential-hardening' ); ?></span>
 								</div>
 								<p class="eh-item-desc"><?php esc_html_e( 'Cierra comentarios en front-end, bloquea llamadas directas a wp-comments-post.php con HTTP 403 Forbidden, suprime endpoints de la REST API (/wp/v2/comments), cancela feeds y limpia menús del panel.', 'essential-hardening' ); ?></p>
+							</div>
+						</div>
+					</div>
+				</div>
+
+				<!-- CATEGORÍA 5: Mantenimiento & Notificaciones de Actualizaciones -->
+				<div class="eh-card">
+					<div class="eh-card-header">
+						<span class="eh-card-icon">🔔</span>
+						<div>
+							<h2 class="eh-card-title"><?php esc_html_e( '5. Notificaciones de Actualizaciones de Seguridad', 'essential-hardening' ); ?></h2>
+							<p class="eh-card-desc"><?php esc_html_e( 'Monitorea periódicamente el estado de plugins, temas y WordPress para avisar ante versiones pendientes o vulnerables.', 'essential-hardening' ); ?></p>
+						</div>
+					</div>
+
+					<div class="eh-grid">
+						<div class="eh-item">
+							<input type="checkbox" id="eh_update_notifications" name="<?php echo esc_attr( self::OPTION_NAME ); ?>[update_notifications]" value="1" <?php checked( $options['update_notifications'] ); ?>>
+							<div class="eh-item-body">
+								<div class="eh-item-title-row">
+									<label for="eh_update_notifications" class="eh-item-label"><?php esc_html_e( 'Alertas de Actualizaciones Pendientes y Completadas', 'essential-hardening' ); ?></label>
+									<span class="eh-tag eh-tag-firewall"><?php esc_html_e( 'Monitoreo Activo', 'essential-hardening' ); ?></span>
+								</div>
+								<p class="eh-item-desc"><?php esc_html_e( 'Revisa diariamente el sitio y envía un correo consolidado si hay plugins o temas pendientes de actualizar. También confirma cuando se ejecutan auto-actualizaciones con éxito.', 'essential-hardening' ); ?></p>
+
+								<div class="eh-sub-settings" style="align-items: flex-end;">
+									<div class="eh-sub-setting" style="flex: 1; min-width: 260px;">
+										<label for="eh_update_notify_email"><?php esc_html_e( 'Enviar notificaciones a:', 'essential-hardening' ); ?></label>
+										<input type="email" id="eh_update_notify_email" name="<?php echo esc_attr( self::OPTION_NAME ); ?>[update_notify_email]" value="<?php echo esc_attr( $options['update_notify_email'] ); ?>" placeholder="<?php echo esc_attr( get_option( 'admin_email' ) ); ?>" style="height: 32px; border-radius: 4px;" />
+										<span style="font-size: 11px; color: #646970; margin-top: 2px;">
+											<?php esc_html_e( 'Dejar en blanco para usar el correo del administrador del sitio.', 'essential-hardening' ); ?>
+										</span>
+									</div>
+									<div>
+										<a href="<?php echo esc_url( wp_nonce_url( admin_url( 'admin-post.php?action=eh_test_update_email' ), 'eh_test_email_nonce' ) ); ?>" class="button button-secondary" style="height: 32px; line-height: 30px; font-size: 12px;">
+											<?php esc_html_e( '✉️ Probar Envío de Correo', 'essential-hardening' ); ?>
+										</a>
+									</div>
+								</div>
 							</div>
 						</div>
 					</div>

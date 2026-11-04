@@ -2,13 +2,13 @@
 
 Suite ultraligera, modular y sin dependencias para el endurecimiento (*hardening*) y protección perimetral de cualquier instalación WordPress. Diseñada para proteger portales institucionales, blogs, tiendas o sitios corporativos con cero sobrecarga técnica y sin tablas adicionales en base de datos.
 
-- **Versión:** 1.2.0
+- **Versión:** 1.3.0
 - **Licencia:** GPL-2.0-or-later
 - **Dependencias:** Cero (PHP nativo + Hooks de WordPress)
 
 ---
 
-## 🛡️ Los 13 Escudos de Seguridad
+## 🛡️ Los 14 Escudos de Seguridad
 
 ### 1. Cortafuegos de Peticiones y Query Strings (Micro-WAF)
 - Inspecciona en tiempo real las cadenas de consulta (`$_SERVER['QUERY_STRING']` y `$_SERVER['REQUEST_URI']`).
@@ -76,6 +76,12 @@ Suite ultraligera, modular y sin dependencias para el endurecimiento (*hardening
 - Los usuarios humanos no lo ven ni deben resolver acertijos visuales. Los bots automatizados que autocompletan formularios lo llenan y son neutralizados de inmediato con **HTTP 403 Forbidden**.
 - Cero dependencias: no requiere cuentas de terceros, APIs ni cookies de rastreo externas.
 
+### 14. Alertas de Actualizaciones Pendientes y Completadas
+- Monitorea periódicamente el estado de plugins, temas y el núcleo de WordPress para evitar intrusiones por componentes desactualizados.
+- Envía un correo electrónico consolidado al administrador si detecta versiones con actualizaciones pendientes, con la lista detallada y enlace directo.
+- Filtro inteligente anti-spam: envía solo un resumen consolidado diario evitando la saturación de correos que causan otros plugins como Wordfence.
+- Enruta las notificaciones automáticas de WordPress cuando se completan auto-actualizaciones exitosas al email configurado.
+
 ---
 
 ## 🚀 Instalación en Cualquier Proyecto WordPress
@@ -84,7 +90,7 @@ Suite ultraligera, modular y sin dependencias para el endurecimiento (*hardening
 1. Copia la carpeta `essential-hardening` dentro de `wp-content/plugins/`.
 2. Ve a **Plugins > Plugins Instalados** en tu panel de WordPress.
 3. Haz clic en **Activar**.
-4. Puedes ajustar o activar/desactivar cualquiera de los 13 escudos en **Ajustes > Seguridad Esencial**.
+4. Puedes ajustar o activar/desactivar cualquiera de los 14 escudos en **Ajustes > Seguridad Esencial**.
 
 ### Opción B: Como Plugin Obligatorio (*Must-Use*)
 1. Copia el archivo `essential-hardening.php` o crea un cargador en `wp-content/mu-plugins/`.
