@@ -18,6 +18,8 @@
 !/docs/**
 !/plugins/
 !/plugins/**
+!/tests/
+!/tests/**
 !/.github/
 !/.github/**
 

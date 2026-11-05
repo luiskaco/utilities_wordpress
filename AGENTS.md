@@ -207,7 +207,7 @@ archivos markdown planos.
 
 - **Qué es:** toolkit de micro-plugins de WordPress portables (repo `utilities_wordpress`). Cada carpeta de `plugins/` es un plugin independiente que se copia a cualquier sitio. No es un sitio web: el WordPress de la raíz solo sirve para probarlos en local.
 - **Stack real:** PHP 7.4 a 8.3+ sobre la API nativa de WordPress (5.8+). Sin Node, sin build y sin dependencias externas salvo las ya incluidas en `vendor/`. Local en Laragon.
-- **Comandos:** no hay build ni tests automatizados. Verificar sintaxis con `php -l` sobre los archivos tocados y probar el plugin activándolo en el WordPress local (enlazado con `mklink /J`, ver `docs/DEVELOPMENT.md`). Publicar una versión: tag `<slug>-v<versión>`; GitHub Actions (`.github/workflows/release-plugins.yml`) arma el ZIP y el Release, y Plugin Update Checker lo ofrece como actualización.
+- **Comandos:** no hay build. Tests de `essential-hardening`: `php tests/essential-hardening/run.php` (WordPress local activo; ver `docs/DEVELOPMENT.md`). Verificar sintaxis con `php -l` sobre los archivos tocados y probar el plugin activándolo en el WordPress local (enlazado con `mklink /J`, ver `docs/DEVELOPMENT.md`). Publicar una versión: tag `<slug>-v<versión>`; GitHub Actions (`.github/workflows/release-plugins.yml`) arma el ZIP y el Release, y Plugin Update Checker lo ofrece como actualización.
 - **Estructura:**
   - `plugins/essential-hardening/` — escudos de seguridad (WAF, rate limit, cabeceras, anti-enumeración).
   - `plugins/modern-wp-migrator/` — migración y backups; derivado de All-in-One WP Migration (librerías `lib/` de ServMask).
