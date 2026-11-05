@@ -130,3 +130,9 @@ Suite ultraligera, modular y sin dependencias para el endurecimiento (*hardening
 - **WordPress:** 5.8 o superior (probado hasta WordPress 7.1).
 - **Multisite:** Totalmente compatible.
 - **Rendimiento:** 0 consultas pesadas, sin cron jobs innecesarios, sin telemetría ni publicidad.
+
+---
+
+## 📝 Historial de cambios
+
+Ver [docs/essential-hardening.md](../../docs/essential-hardening.md#6-historial-de-cambios).

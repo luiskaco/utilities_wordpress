@@ -78,8 +78,17 @@ php tests/essential-hardening/run.php
 
 El repositorio usa **GitHub Actions** para empaquetar cada plugin en su propio archivo `.zip` e integrarlo con **Plugin Update Checker (PUC)**.
 
+### Documentación obligatoria en cada cambio grande
+
+Un cambio grande es una función nueva, un cambio de comportamiento visible, una corrección de seguridad o algo que se elimina. Antes de publicar:
+
+- Actualiza el `README.md` del plugin si cambia lo que el usuario ve o configura.
+- Actualiza `docs/<plugin>.md` (diseño, opciones almacenadas y la tabla **Historial de cambios**).
+- Actualiza el catálogo en el `README.md` de la raíz (versión y descripción).
+- Si hay una decisión de diseño que no se ve en el código, anótala en `docs/<plugin>.md`.
+
 ### Cómo publicar una nueva versión de un plugin:
-1. Incrementa la versión en la cabecera PHP y constante `VERSION` de tu plugin.
+1. Incrementa la versión en la cabecera PHP y constante `VERSION` de tu plugin. El workflow **rechaza** el release si la cabecera no coincide con el tag.
 2. Crea una etiqueta git con el formato `<slug-plugin>-v<version>` y súbela:
    ```bash
    git tag wp-llms-txt-v1.0.1
@@ -87,5 +96,11 @@ El repositorio usa **GitHub Actions** para empaquetar cada plugin en su propio a
    ```
 3. GitHub Actions empaquetará automáticamente la carpeta del plugin en `<slug-plugin>.zip` y creará un Release en GitHub.
 4. Cualquier sitio WordPress con el plugin instalado detectará la actualización y permitirá actualizar en un clic desde el escritorio.
+
+> Sube **un tag por vez**. Si se suben varios a la vez, GitHub puede no disparar el workflow; en ese caso se lanza a mano:
+
+```bash
+gh workflow run release-plugins.yml -f plugin=<slug-plugin> -f version=<version>
+```
 
 *También puedes disparar el empaquetado manualmente desde la pestaña **Actions > Release WordPress Plugin** en GitHub seleccionando el plugin y la versión.*

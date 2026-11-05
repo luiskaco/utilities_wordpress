@@ -10,7 +10,7 @@ Herramienta completa, modernizada y sin restricciones para la migración, export
 - **Límite de subida de 500 GB:** Desbloquea la restricción artificial tradicional de 512 MB para importar backups `.wpress` de gran envergadura directamente desde el navegador.
 - **Restauración nativa en 1 clic:** Permite restaurar copias de seguridad directamente desde la lista de backups en el panel de WordPress.
 - **Compatibilidad verificada:** Probado exhaustivamente en **PHP 8.0, 8.1, 8.2 y 8.3+** sobre WordPress 6.x.
-- **Sin telemetría ni publicidad:** Código limpio, sin avisos comerciales, llamadas de seguimiento externas ni botones bloqueados.
+- **Sin telemetría ni publicidad:** Código limpio, sin avisos comerciales, llamadas de seguimiento externas ni botones bloqueados. Desde 7.113.3 se eliminó también el formulario de *feedback* que enviaba el correo y el mensaje del usuario a servmask.com.
 - **Procesamiento por fragmentos (Chunks de 512 KB):** Evita errores de agotamiento de memoria (`memory_limit`) o tiempo de ejecución en servidores compartidos.
 
 ---
@@ -37,3 +37,21 @@ Herramienta completa, modernizada y sin restricciones para la migración, export
    - **Exportar:** Genera un archivo `.wpress` con toda la base de datos, temas, plugins y subidas.
    - **Importar:** Arrastra y suelta un archivo `.wpress` para restaurar o migrar el sitio.
    - **Copias de seguridad:** Administra y restaura backups existentes con un solo clic.
+
+---
+
+## 4. Compatibilidad con All-in-One WP Migration
+
+Este plugin es un fork y conserva las clases `Ai1wm_*`, las constantes `AI1WM_*` y el dominio de traducción del original. **No pueden estar activos a la vez.** Desde 7.113.3, `modern-wp-migrator.php` comprueba al cargar si `AI1WM_PLUGIN_BASENAME` o `Ai1wm_Main_Controller` ya existen; si es así, no carga el resto del plugin y muestra un aviso de administrador, en lugar de provocar un error fatal por redeclaración.
+
+Las correcciones de seguridad del código original **no llegan solas**: hay que revisarlas y traerlas a mano. El número `7.113.x` indica la base de la que partió el fork, no que esté al día con el original.
+
+---
+
+## 5. Historial de cambios
+
+| Versión | Cambios |
+|---------|---------|
+| **7.113.3** | Se elimina el formulario y el endpoint de *feedback* hacia servmask.com. Evita el error fatal si All-in-One WP Migration está activo. El actualizador deja de depender del namespace interno `v5p7` de PUC. |
+| **7.113.2** | Corrección del actualizador para releases en monorepo. |
+| **7.113.0 – 7.113.1** | Integración en el repositorio central, interfaz modernizada y Plugin Update Checker. |

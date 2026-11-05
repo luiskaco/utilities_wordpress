@@ -214,7 +214,7 @@ archivos markdown planos.
   - `plugins/wp-llms-txt/` — generador y endpoint de `/llms.txt` y `/llms-full.txt`.
   - `docs/` — una guía técnica por plugin y `DEVELOPMENT.md` (cómo agregar y publicar plugins).
   - El núcleo de WordPress, `wp-content/` y `wp-config.php` de la raíz no se versionan ni se tocan.
-- **Documentación:** no usa la tabla de § 5. La documentación vive en `README.md` (catálogo de plugins), `docs/<plugin>.md` y el `README.md` de cada plugin; al cambiar un plugin se actualizan esos archivos y su `changelog`/versión.
+- **Documentación:** no usa la tabla de § 5. La documentación vive en `README.md` (catálogo de plugins), `docs/<plugin>.md` y el `README.md` de cada plugin. **Ante cualquier cambio grande** (función nueva, cambio de comportamiento, corrección de seguridad, algo eliminado) se actualizan, antes de publicar: el README del plugin, `docs/<plugin>.md` con su tabla *Historial de cambios*, el catálogo del README raíz y la versión (cabecera y constante). Detalle en `docs/DEVELOPMENT.md`.
 - **Excepciones a las reglas:**
   - Las reglas de SEO no aplican: no es un sitio público. `wp-llms-txt` genera esos archivos para los sitios donde se instala y sigue el estándar de llmstxt.org.
   - Código de terceros vendorizado (`plugins/*/vendor/`, `plugins/modern-wp-migrator/lib/vendor/`): no se edita a mano.

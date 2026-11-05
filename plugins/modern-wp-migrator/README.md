@@ -126,6 +126,8 @@ Ai1wm.Restore = function(storage, archive) {
 ## 🔒 Security & Privacy
 
 - **No Remote Telemetry**: Does not send usage analytics, site domains, or database metadata to external servers.
+- **No Feedback Form (since 7.113.3)**: The original "leave feedback" form that posted the user's email and message to servmask.com was removed, together with its AJAX endpoint.
+- **Cannot Run Next to All-in-One WP Migration**: Both plugins share the `Ai1wm_*` classes and `AI1WM_*` constants. If the original plugin is active, Modern WP Migrator does not load and shows an admin notice asking you to deactivate one of them (instead of a fatal error).
 - **Directory Protection**: The backup directory (`wp-content/ai1wm-backups/`) includes `.htaccess` and `web.config` rules to prevent unauthorized direct HTTP access.
 - **Nonce & Capability Verification**: All AJAX calls strictly verify WordPress nonces and check for `export_site` or `import_site` administrator capabilities.
 
