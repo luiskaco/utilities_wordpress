@@ -89,11 +89,6 @@ define( 'BANDAR_TEMPLATES_PATH', AI1WM_TEMPLATES_PATH );
 // ===============
 define( 'AI1WM_VENDOR_PATH', AI1WM_LIB_PATH . DIRECTORY_SEPARATOR . 'vendor' );
 
-// =========================
-// = ServMask Feedback URL =
-// =========================
-define( 'AI1WM_FEEDBACK_URL', 'https://servmask.com/ai1wm/feedback/create' );
-
 // ==============================
 // = ServMask Archive Tools URL =
 // ==============================

@@ -49,7 +49,6 @@ class Ai1wm_Not_Valid_Secret_Key_Exception extends Exception {}
 class Ai1wm_Quota_Exceeded_Exception extends Exception {}
 class Ai1wm_Storage_Exception extends Exception {}
 class Ai1wm_Compatibility_Exception extends Exception {}
-class Ai1wm_Feedback_Exception extends Exception {}
 class Ai1wm_Database_Exception extends Exception {}
 class Ai1wm_Not_Encryptable_Exception extends Exception {}
 class Ai1wm_Not_Decryptable_Exception extends Exception {}

@@ -771,17 +771,6 @@ class Ai1wm_Main_Controller {
 			false
 		);
 
-		wp_localize_script(
-			'ai1wm_servmask',
-			'ai1wm_feedback',
-			array(
-				'ajax'       => array(
-					'url' => wp_make_link_relative( add_query_arg( array( 'ai1wm_import' => 1 ), admin_url( 'admin-ajax.php?action=ai1wm_feedback' ) ) ),
-				),
-				'secret_key' => get_option( AI1WM_SECRET_KEY ),
-			)
-		);
-
 		$upload_limit_text = sprintf(
 			/* translators: 1: Max upload file size */
 			__(
@@ -805,9 +794,6 @@ class Ai1wm_Main_Controller {
 			'ai1wm_servmask',
 			'ai1wm_locale',
 			array(
-				// Feedback
-				'thanks_for_submitting_your_feedback' => __( 'Thank you! We have received your request and will be in touch soon.', 'all-in-one-wp-migration' ),
-
 				// Updater
 				'check_for_updates'                   => __( 'Check for updates', 'all-in-one-wp-migration' ),
 				'invalid_purchase_id'                 => __( 'Your purchase ID is invalid. Please <a href="mailto:support@servmask.com">contact us</a>.', 'all-in-one-wp-migration' ),
@@ -1332,7 +1318,6 @@ class Ai1wm_Main_Controller {
 		add_action( 'wp_ajax_ai1wm_export', 'Ai1wm_Export_Controller::export' );
 		add_action( 'wp_ajax_ai1wm_import', 'Ai1wm_Import_Controller::import' );
 		add_action( 'wp_ajax_ai1wm_status', 'Ai1wm_Status_Controller::status' );
-		add_action( 'wp_ajax_ai1wm_feedback', 'Ai1wm_Feedback_Controller::feedback' );
 
 		if ( current_user_can( 'ai1wm_import_site' ) ) {
 			add_action( 'wp_ajax_ai1wm_backup_clean', 'Ai1wm_Backups_Controller::clean' );

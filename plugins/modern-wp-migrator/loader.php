@@ -65,7 +65,6 @@ require_once AI1WM_VENDOR_PATH . '/servmask/database/class-ai1wm-database-utilit
 
 require_once AI1WM_CONTROLLER_PATH . '/class-ai1wm-backups-controller.php';
 require_once AI1WM_CONTROLLER_PATH . '/class-ai1wm-export-controller.php';
-require_once AI1WM_CONTROLLER_PATH . '/class-ai1wm-feedback-controller.php';
 require_once AI1WM_CONTROLLER_PATH . '/class-ai1wm-import-controller.php';
 require_once AI1WM_CONTROLLER_PATH . '/class-ai1wm-main-controller.php';
 require_once AI1WM_CONTROLLER_PATH . '/class-ai1wm-rest-controller.php';
@@ -117,7 +116,6 @@ require_once AI1WM_MODEL_PATH . '/class-ai1wm-backups.php';
 require_once AI1WM_MODEL_PATH . '/class-ai1wm-compatibility.php';
 require_once AI1WM_MODEL_PATH . '/class-ai1wm-deprecated.php';
 require_once AI1WM_MODEL_PATH . '/class-ai1wm-extensions.php';
-require_once AI1WM_MODEL_PATH . '/class-ai1wm-feedback.php';
 require_once AI1WM_MODEL_PATH . '/class-ai1wm-handler.php';
 require_once AI1WM_MODEL_PATH . '/class-ai1wm-log.php';
 require_once AI1WM_MODEL_PATH . '/class-ai1wm-message.php';
