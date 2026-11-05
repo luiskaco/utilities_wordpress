@@ -2,7 +2,7 @@
 
 Suite modular, ultraligera y sin dependencias externas para el endurecimiento y seguridad perimetral integral de sitios WordPress.
 
-- **Versión:** 1.6.0
+- **Versión:** 1.7.0
 - **Licencia:** GPL-2.0-or-later
 - **Compatibilidad:** WordPress 5.8+ | PHP 7.4 - 8.5
 
@@ -19,7 +19,7 @@ El plugin **Essential Hardening & Security** está diseñado bajo los principios
 
 ---
 
-## 2. Los 21 Módulos de Protección y Auditoría
+## 2. Los 24 Módulos de Protección y Auditoría
 
 ### 2.1. Micro-WAF / Cortafuegos de Peticiones y Query Strings
 Inspecciona tanto la cadena de consulta cruda (`QUERY_STRING`) como la decodificada en cada petición HTTP antes de que los componentes del núcleo o plugins comiencen su procesamiento:
@@ -157,6 +157,26 @@ Visibilidad en tiempo real de los intentos maliciosos bloqueados:
 - Antes de verificar se amplía el límite de ejecución a 300 s (`set_time_limit`), porque hay que leer unos 3.500 archivos. En pruebas tardó unos 3 s con los archivos ya en caché del sistema; la primera lectura en frío, en Windows con antivirus, llegó a 137 s. En un hosting normal se espera mucho menos, pero por eso el límite se amplía.
 - Privacidad: la única llamada saliente es la de las sumas de control, una vez al día. No se envían datos del sitio aparte de la versión y el idioma de WordPress.
 
+### 2.22. Protección de la Recuperación de Contraseña — desde 1.7.0
+- Opción `lostpassword_protection` (por defecto `true`).
+- `lostpassword_post`: máximo 5 solicitudes POST por IP y hora (transient `eh_lostpw_<md5(ip)>`, filtro `essential_hardening_lostpassword_max_per_hour`). Al superarlo añade el error `eh_lostpw_limited`. El evento `Recuperación` se registra solo la primera vez que se supera el límite. El contador no se renueva con los intentos bloqueados, así que un atacante no puede extender el castigo.
+- `lostpassword_errors` (prioridad 99): si los únicos errores son `invalid_email`, o no hay errores pero el usuario no existe, redirige a `wp-login.php?checkemail=confirm`, la misma pantalla que ve una solicitud válida. Los errores de campo vacío y de límite se siguen mostrando.
+- Limitación conocida: una solicitud válida envía un correo y una inexistente no, así que un atacante muy paciente podría distinguirlas midiendo tiempos de respuesta. El límite de 5 por hora lo hace poco práctico.
+
+### 2.23. Desactivar Contraseñas de Aplicación — opcional, desde 1.7.0
+- Opción `disable_application_passwords` (por defecto `false`). Aplica `__return_false` a `wp_is_application_passwords_available`.
+- Motivo: la autenticación por contraseña de aplicación en la REST API no pasa por `wp-login.php`, así que no la cubren ni el 2FA por correo ni el bloqueo de intentos.
+
+### 2.24. Contraseñas Robustas para Administradores — opcional, desde 1.7.0
+- Opción `strong_admin_passwords` (por defecto `false`).
+- Hooks: `user_profile_update_errors` (crear o editar usuarios; valida cuando el rol será `administrator` o el usuario existente tiene `manage_options`) y `validate_password_reset` (restablecimiento desde el correo).
+- Reglas: longitud mínima 12 (filtro `essential_hardening_admin_password_min_length`, nunca menos de 8) y comprobación en Have I Been Pwned: `GET https://api.pwnedpasswords.com/range/<5 primeros caracteres del SHA-1>` con `Add-Padding: true`. La comparación del resto del hash se hace localmente.
+- Fallo abierto: si la API no responde o devuelve un error, la contraseña se acepta. No se bloquea a nadie por una caída externa.
+- El error se registra con el código `eh_weak_password`.
+
+### Cambio en 2.4 (anti-enumeración)
+Desde 1.7.0 también se elimina el proveedor `users` del mapa del sitio de WordPress (`wp_sitemaps_add_provider`), que exponía la lista de autores en `/wp-sitemap-users-1.xml`.
+
 ## 3. Configuración en Base de Datos
 
 El plugin almacena sus preferencias en una única entrada en `wp_options`:
@@ -189,6 +209,9 @@ El plugin almacena sus preferencias en una única entrada en `wp_options`:
       'csp_report_only'           => false,
       'admin_change_alerts'       => true,
       'core_integrity_check'      => false,
+      'lostpassword_protection'   => true,
+      'disable_application_passwords' => false,
+      'strong_admin_passwords'    => false,
   )
   ```
 
@@ -220,6 +243,8 @@ Se usan desde el tema hijo, un `mu-plugin` o un plugin propio. No hace falta edi
 | `essential_hardening_core_integrity_ignore` | Lista de rutas relativas que la verificación de integridad ignora (por defecto `readme.html`, `license.txt`, `wp-config-sample.php`, `wp-admin/install.php`). |
 | `essential_hardening_core_root` | Directorio raíz de WordPress a verificar, para instalaciones con el núcleo en otra carpeta. |
 | `essential_hardening_core_checksums` | Proveer las sumas de control manualmente (`array`) o simular que no hay (`false`). Pensado para pruebas y entornos sin salida a internet. |
+| `essential_hardening_lostpassword_max_per_hour` | Máximo de solicitudes de recuperación de contraseña por IP y hora (por defecto 5). |
+| `essential_hardening_admin_password_min_length` | Longitud mínima de la contraseña de un administrador (por defecto 12, mínimo 8). |
 | `essential_hardening_client_ip` | Resolver la IP real detrás de un proxy o CDN de confianza (ej. Cloudflare). Por defecto solo se usa `REMOTE_ADDR`, porque `X-Forwarded-For` se puede falsificar. |
 | `essential_hardening_failed_login_delay` | Segundos de retardo tras un login fallido (por defecto 2, máximo 5). `0` lo desactiva. |
 | `essential_hardening_waf_patterns` | Añadir o quitar expresiones regulares del Micro-WAF. |
@@ -245,6 +270,7 @@ Notas de comportamiento:
 
 | Versión | Cambios |
 |---------|---------|
+| **1.7.0** | Protección de cuentas. Recuperación de contraseña limitada a 5 solicitudes por IP y hora y con la misma respuesta exista o no la cuenta (activada por defecto). Opción para desactivar las contraseñas de aplicación, que se saltan el 2FA. Opción de exigir a los administradores contraseñas de al menos 12 caracteres que no estén en filtraciones conocidas (Have I Been Pwned, k-anonimato). La anti-enumeración quita también el mapa del sitio de usuarios. Filtros `..._lostpassword_max_per_hour` y `..._admin_password_min_length`. 24 escudos en total. |
 | **1.6.0** | Alertas por correo cuando se crea un Administrador o se promueve una cuenta a ese rol (activadas por defecto). Verificación diaria opcional de la integridad del núcleo de WordPress contra las sumas de control oficiales, con botón "Verificar ahora" y resultado en el panel. Nuevos filtros `essential_hardening_core_integrity_ignore`, `..._core_root` y `..._core_checksums`. 21 escudos en total. `uninstall.php` y la desactivación limpian el cron y el informe nuevos. |
 | **1.5.0** (compatibilidad) | Declarado PHP 7.4 a 8.5. Las pruebas se ejecutaron con PHP 8.3, 8.4 y 8.5 sin avisos; la sintaxis se revisa de 7.4 a 8.5 en la integración continua. |
 | **1.5.0** | HSTS opcional (duración configurable, solo por HTTPS) y Content-Security-Policy en modo solo-reporte. Ambos vienen desactivados. 19 escudos en total. |

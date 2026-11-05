@@ -2,13 +2,13 @@
 
 Suite ultraligera, modular y sin dependencias para el endurecimiento (*hardening*) y protección perimetral de cualquier instalación WordPress. Diseñada para proteger portales institucionales, blogs, tiendas o sitios corporativos con cero sobrecarga técnica y sin tablas adicionales en base de datos.
 
-- **Versión:** 1.6.0
+- **Versión:** 1.7.0
 - **Licencia:** GPL-2.0-or-later
 - **Dependencias:** Cero (PHP nativo + Hooks de WordPress)
 
 ---
 
-## 🛡️ Los 21 Escudos y Herramientas de Seguridad
+## 🛡️ Los 24 Escudos y Herramientas de Seguridad
 
 ### 1. Cortafuegos de Peticiones y Query Strings (Micro-WAF)
 - Inspecciona en tiempo real las cadenas de consulta (`$_SERVER['QUERY_STRING']` y `$_SERVER['REQUEST_URI']`).
@@ -122,13 +122,29 @@ Suite ultraligera, modular y sin dependencias para el endurecimiento (*hardening
 - Viene **desactivado** porque consulta `api.wordpress.org` una vez al día. Solo se envían la versión y el idioma de WordPress, igual que hace el propio WordPress para actualizarse.
 - No avisa por `readme.html`, `license.txt` ni `wp-config-sample.php` ausentes, porque muchos hostings los borran a propósito.
 
+### 22. Protección de la Recuperación de Contraseña
+- Limita a **5 solicitudes por IP y por hora** en "¿Olvidaste tu contraseña?", para que nadie pueda llenar de correos el buzón de un usuario.
+- Responde **igual exista o no la cuenta** ("revisa tu correo"). Sin esto, WordPress dice "no hay ninguna cuenta con ese usuario o correo", lo que permite descubrir qué usuarios existen. Viene **activado**.
+- Un campo vacío sigue mostrando su error normal.
+
+### 23. Desactivar Contraseñas de Aplicación — opcional
+- Las contraseñas de aplicación permiten entrar a la REST API **sin pasar por el formulario de login**, así que se saltan el 2FA y el bloqueo de intentos.
+- Actívalo si no usas aplicaciones externas que dependan de ellas (app móvil de WordPress, Zapier, integraciones). Viene **desactivado** para no romper nada.
+
+### 24. Contraseñas Robustas para Administradores — opcional
+- Al crear o cambiar la contraseña de un **Administrador** (también al restablecerla) exige **al menos 12 caracteres** y comprueba que **no aparezca en filtraciones de datos conocidas** (servicio Have I Been Pwned).
+- **Privacidad:** solo se envían los 5 primeros caracteres de un hash SHA-1 (método k-anonimato). Ni la contraseña ni el hash completo salen de tu servidor. Si el servicio no responde, **no bloquea a nadie**.
+- Solo afecta a administradores. Viene **desactivado** porque hace una consulta externa cada vez que se cambia una contraseña.
+
+> Además, el escudo de **anti-enumeración de usuarios** quita ahora también el mapa del sitio de usuarios (`/wp-sitemap-users-1.xml`), que lista a los autores.
+
 ## 🚀 Instalación en Cualquier Proyecto WordPress
 
 ### Opción A: Como Plugin Estándar
 1. Copia la carpeta `essential-hardening` dentro de `wp-content/plugins/`.
 2. Ve a **Plugins > Plugins Instalados** en tu panel de WordPress.
 3. Haz clic en **Activar**.
-4. Puedes ajustar o activar/desactivar cualquiera de los 21 escudos en **Ajustes > Seguridad Esencial**.
+4. Puedes ajustar o activar/desactivar cualquiera de los 24 escudos en **Ajustes > Seguridad Esencial**.
 
 ### Opción B: Como Plugin Obligatorio (*Must-Use*)
 1. Copia el archivo `essential-hardening.php` o crea un cargador en `wp-content/mu-plugins/`.

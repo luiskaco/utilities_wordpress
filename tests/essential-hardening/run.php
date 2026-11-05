@@ -469,12 +469,200 @@ Set-Cookie: x=1";
 	}
 	rmdir( $root );
 
+	// -----------------------------------------------------------------------
+	eh_section( 'Recuperación de contraseña' );
+	// -----------------------------------------------------------------------
+	$_SERVER['REQUEST_METHOD'] = 'POST';
+	$lp_key = 'eh_lostpw_' . md5( $ip );
+	delete_transient( $lp_key );
+
+	$limited_at = null;
+	for ( $i = 1; $i <= 7; $i++ ) {
+		$e = new WP_Error();
+		$eh->limit_lostpassword_requests( $e, false );
+		if ( null === $limited_at && $e->get_error_code() === 'eh_lostpw_limited' ) {
+			$limited_at = $i;
+		}
+	}
+	eh_assert( 6 === $limited_at, 'permite 5 solicitudes por hora y bloquea la 6ª' );
+	$e = new WP_Error();
+	$eh->limit_lostpassword_requests( $e, false );
+	eh_assert( 'eh_lostpw_limited' === $e->get_error_code(), 'las siguientes solicitudes siguen bloqueadas' );
+
+	$events = get_option( 'eh_security_events_log', array() );
+	$types  = is_array( $events ) ? array_count_values( wp_list_pluck( $events, 'type' ) ) : array();
+	eh_assert( 1 === ( $types['Recuperación'] ?? 0 ), 'el límite se registra una sola vez, no en cada intento' );
+
+	delete_transient( $lp_key );
+	add_filter( 'essential_hardening_lostpassword_max_per_hour', function () {
+		return 2;
+	} );
+	$codes = array();
+	for ( $i = 1; $i <= 3; $i++ ) {
+		$e = new WP_Error();
+		$eh->limit_lostpassword_requests( $e, false );
+		$codes[] = $e->get_error_code();
+	}
+	eh_assert( array( '', '', 'eh_lostpw_limited' ) === $codes, 'el límite se ajusta con el filtro essential_hardening_lostpassword_max_per_hour' );
+	remove_all_filters( 'essential_hardening_lostpassword_max_per_hour' );
+
+	delete_transient( $lp_key );
+	$_SERVER['REQUEST_METHOD'] = 'GET';
+	$e = new WP_Error();
+	for ( $i = 0; $i < 10; $i++ ) {
+		$eh->limit_lostpassword_requests( $e, false );
+	}
+	eh_assert( ! $e->has_errors() && false === get_transient( $lp_key ), 'las peticiones GET no cuentan' );
+	$_SERVER['REQUEST_METHOD'] = 'POST';
+
+	// Respuesta genérica: misma salida exista o no la cuenta
+	add_filter( 'wp_redirect', function ( $location ) {
+		throw new EH_Redirect_Exception( (string) $location );
+	} );
+	$redirected = function ( WP_Error $errors, $user_data ) use ( $eh ) {
+		try {
+			$eh->generic_lostpassword_response( $errors, $user_data );
+		} catch ( EH_Redirect_Exception $ex ) {
+			return $ex->getMessage();
+		}
+		return null;
+	};
+
+	$loc = $redirected( new WP_Error( 'invalid_email', 'no existe' ), false );
+	eh_assert( null !== $loc && false !== strpos( $loc, 'checkemail=confirm' ), 'correo inexistente => misma pantalla de "revisa tu correo"' );
+	$loc = $redirected( new WP_Error(), false );
+	eh_assert( null !== $loc && false !== strpos( $loc, 'checkemail=confirm' ), 'usuario inexistente => misma pantalla de "revisa tu correo"' );
+	eh_assert( null === $redirected( new WP_Error(), $admin ), 'cuenta que existe => flujo normal de WordPress (no se intercepta)' );
+	eh_assert( null === $redirected( new WP_Error( 'empty_username', 'vacío' ), false ), 'campo vacío => se muestra el error normal' );
+	$mixed = new WP_Error( 'eh_lostpw_limited', 'límite' );
+	$mixed->add( 'invalid_email', 'no existe' );
+	eh_assert( null === $redirected( $mixed, false ), 'si hay límite de solicitudes, se muestra el error del límite' );
+	remove_all_filters( 'wp_redirect' );
+	delete_transient( $lp_key );
+	$_SERVER['REQUEST_METHOD'] = 'GET';
+
+	// -----------------------------------------------------------------------
+	eh_section( 'Mapa del sitio de usuarios' );
+	// -----------------------------------------------------------------------
+	eh_assert( false === apply_filters( 'wp_sitemaps_add_provider', new stdClass(), 'users' ), 'el mapa del sitio de usuarios (lista de autores) está desactivado' );
+	$posts_provider = new stdClass();
+	eh_assert( $posts_provider === apply_filters( 'wp_sitemaps_add_provider', $posts_provider, 'posts' ), 'el mapa del sitio de entradas no se toca' );
+
+	// -----------------------------------------------------------------------
+	eh_section( 'Contraseñas robustas para administradores' );
+	// -----------------------------------------------------------------------
+	$pw_calls = array();
+	$pw_mode  = 'clean';
+	$breached = 'Clave-Filtrada-Larga-2026';
+	$bhash    = strtoupper( sha1( $breached ) );
+	add_filter( 'pre_http_request', function ( $pre, $args, $url ) use ( &$pw_calls, &$pw_mode, $bhash ) {
+		if ( false === strpos( $url, 'api.pwnedpasswords.com/range/' ) ) {
+			return $pre;
+		}
+		$pw_calls[] = array( 'url' => $url, 'args' => $args );
+		if ( 'down' === $pw_mode ) {
+			return new WP_Error( 'http_request_failed', 'sin conexión' );
+		}
+		if ( 'error500' === $pw_mode ) {
+			return array( 'response' => array( 'code' => 500, 'message' => 'Error' ), 'body' => 'x', 'headers' => array(), 'cookies' => array(), 'filename' => null );
+		}
+		$body = "0018A45C4D1DEF81644B54AB7F969B88D65:3\r\n00D4F6E8FA6EECAD2A3AA415EEC418D38EC:0\r\n";
+		if ( 'breached' === $pw_mode ) {
+			$body .= substr( $bhash, 5 ) . ":42\r\n";
+		}
+		if ( 'padded' === $pw_mode ) {
+			$body .= substr( $bhash, 5 ) . ":0\r\n"; // Relleno (padding) con 0 apariciones.
+		}
+		return array( 'response' => array( 'code' => 200, 'message' => 'OK' ), 'body' => $body, 'headers' => array(), 'cookies' => array(), 'filename' => null );
+	}, 10, 3 );
+
+	$pw_calls = array();
+	$msg      = $eh->get_admin_password_problem( 'corta123' );
+	eh_assert( '' !== $msg && 0 === count( $pw_calls ), 'una contraseña corta se rechaza sin consultar a ningún servicio' );
+
+	$pw_mode = 'breached';
+	$msg     = $eh->get_admin_password_problem( $breached );
+	eh_assert( '' !== $msg && false !== strpos( $msg, '42' ), 'una contraseña filtrada se rechaza e indica cuántas veces aparece' );
+	$sent = $pw_calls[0]['url'] ?? '';
+	eh_assert( 1 === preg_match( '#/range/[0-9A-F]{5}$#', $sent ), 'solo se envían 5 caracteres del hash a la API' );
+	eh_assert( false === strpos( $sent, substr( $bhash, 5 ) ) && false === strpos( $sent, $breached ), 'ni la contraseña ni el resto del hash salen del servidor' );
+	eh_assert( 'true' === ( $pw_calls[0]['args']['headers']['Add-Padding'] ?? '' ), 'pide relleno (Add-Padding) para ocultar el tamaño de la respuesta' );
+
+	$pw_mode = 'clean';
+	eh_assert( '' === $eh->get_admin_password_problem( 'Una-Clave-Larga-Y-Unica-77' ), 'una contraseña larga que no aparece en filtraciones se acepta' );
+	$pw_mode = 'padded';
+	eh_assert( '' === $eh->get_admin_password_problem( $breached ), 'las entradas de relleno con 0 apariciones no cuentan como filtración' );
+	$pw_mode = 'down';
+	eh_assert( '' === $eh->get_admin_password_problem( $breached ), 'si el servicio no responde, no se bloquea a nadie' );
+	$pw_mode = 'error500';
+	eh_assert( '' === $eh->get_admin_password_problem( $breached ), 'si el servicio devuelve error, no se bloquea a nadie' );
+
+	add_filter( 'essential_hardening_admin_password_min_length', function () {
+		return 20;
+	} );
+	$pw_mode = 'clean';
+	eh_assert( '' !== $eh->get_admin_password_problem( 'Quince-Letras-15' ), 'la longitud mínima se ajusta con el filtro' );
+	remove_all_filters( 'essential_hardening_admin_password_min_length' );
+
+	// Ganchos de WordPress
+	$pw_mode  = 'breached';
+	$pw_calls = array();
+	$e        = new WP_Error();
+	$eh->validate_admin_password_on_profile( $e, false, (object) array( 'user_pass' => $breached, 'role' => 'administrator' ) );
+	eh_assert( 'eh_weak_password' === $e->get_error_code(), 'al crear un Administrador con contraseña filtrada se rechaza' );
+
+	$pw_calls = array();
+	$e        = new WP_Error();
+	$eh->validate_admin_password_on_profile( $e, false, (object) array( 'user_pass' => $breached, 'role' => 'subscriber' ) );
+	eh_assert( ! $e->has_errors() && 0 === count( $pw_calls ), 'un suscriptor no se valida ni consulta nada' );
+
+	$e = new WP_Error();
+	$eh->validate_admin_password_on_profile( $e, true, (object) array( 'user_pass' => $breached, 'ID' => $admin_id ) );
+	eh_assert( 'eh_weak_password' === $e->get_error_code(), 'al editar a un administrador existente se valida su nueva contraseña' );
+
+	$e = new WP_Error();
+	$eh->validate_admin_password_on_profile( $e, true, (object) array( 'user_pass' => $breached, 'ID' => $editor_id ) );
+	eh_assert( ! $e->has_errors(), 'editar a un editor no se valida' );
+
+	$e = new WP_Error();
+	$eh->validate_admin_password_on_profile( $e, true, (object) array( 'user_pass' => '', 'ID' => $admin_id ) );
+	eh_assert( ! $e->has_errors(), 'si no se cambia la contraseña no se valida nada' );
+
+	$_SERVER['REQUEST_METHOD'] = 'POST';
+	$_POST['pass1']            = wp_slash( $breached );
+	$e = new WP_Error();
+	$eh->validate_admin_password_on_reset( $e, $admin );
+	eh_assert( 'eh_weak_password' === $e->get_error_code(), 'el restablecimiento de contraseña de un administrador también se valida' );
+	$e = new WP_Error();
+	$eh->validate_admin_password_on_reset( $e, $editor );
+	eh_assert( ! $e->has_errors(), 'el restablecimiento de un editor no se valida' );
+	unset( $_POST['pass1'] );
+	$_SERVER['REQUEST_METHOD'] = 'GET';
+	remove_all_filters( 'pre_http_request' );
+
+	// -----------------------------------------------------------------------
+	eh_section( 'Contraseñas de aplicación' );
+	// -----------------------------------------------------------------------
+	eh_assert( false === $eh->get_default_settings()['disable_application_passwords'], 'las contraseñas de aplicación siguen permitidas por defecto' );
+	eh_assert( false === $eh->get_default_settings()['strong_admin_passwords'], 'la comprobación de contraseñas viene apagada por defecto' );
+	eh_assert( true === $eh->get_default_settings()['lostpassword_protection'], 'la protección de recuperación viene activa por defecto' );
+
+	// Se registra en una instancia aparte, al final, para no alterar el resto de pruebas
+	$fresh = ( new ReflectionClass( 'Essential_Hardening' ) )->newInstanceWithoutConstructor();
+	eh_set_options( $fresh, array( 'disable_application_passwords' => true, 'update_notifications' => false, 'admin_login_alerts' => false, 'admin_change_alerts' => false ) );
+	$init = new ReflectionMethod( $fresh, 'init_modules' );
+	$init->setAccessible( true );
+	$init->invoke( $fresh );
+	eh_assert( false === wp_is_application_passwords_available(), 'con la opción activa, WordPress deja de ofrecer contraseñas de aplicación' );
+	remove_all_filters( 'wp_is_application_passwords_available' );
+
 } finally {
 	// Restaurar el estado del sitio local
 	remove_all_filters( 'pre_wp_mail' );
 	remove_all_filters( 'wp_redirect' );
 	eh_clear_ip_state( $ip );
 	delete_transient( 'eh_2fa_rate_' . $admin_id );
+	delete_transient( 'eh_lostpw_' . md5( $ip ) );
 	delete_option( 'eh_core_integrity_last' );
 	delete_transient( 'eh_last_core_alert_hash' );
 	delete_transient( 'eh_admin_change_' . $editor_id );
