@@ -173,3 +173,28 @@ Si deseas que el plugin se ejecute de forma obligatoria en un servidor y que nin
    require_once WPMU_PLUGIN_DIR . '/essential-hardening/essential-hardening.php';
    ```
 3. WordPress lo ejecutará automáticamente antes de los plugins estándar.
+
+## 5. Filtros de Personalización (desde 1.4.2)
+
+Se usan desde el tema hijo, un `mu-plugin` o un plugin propio. No hace falta editar este plugin.
+
+| Filtro | Para qué sirve |
+|--------|----------------|
+| `essential_hardening_client_ip` | Resolver la IP real detrás de un proxy o CDN de confianza (ej. Cloudflare). Por defecto solo se usa `REMOTE_ADDR`, porque `X-Forwarded-For` se puede falsificar. |
+| `essential_hardening_failed_login_delay` | Segundos de retardo tras un login fallido (por defecto 2, máximo 5). `0` lo desactiva. |
+| `essential_hardening_waf_patterns` | Añadir o quitar expresiones regulares del Micro-WAF. |
+| `essential_hardening_waf_skip` | Devolver `true` para no inspeccionar una petición concreta (recibe la URI). |
+
+```php
+// Cloudflare: confiar en CF-Connecting-IP solo si el sitio está detrás de Cloudflare
+add_filter( 'essential_hardening_client_ip', function ( $ip ) {
+	return ! empty( $_SERVER['HTTP_CF_CONNECTING_IP'] ) ? $_SERVER['HTTP_CF_CONNECTING_IP'] : $ip;
+} );
+```
+
+Notas de comportamiento:
+
+- El Micro-WAF inspecciona la URL y la query string, no el cuerpo de los POST.
+- Mientras una IP está bloqueada, los intentos nuevos no extienden el bloqueo ni aplican retardo.
+- El Micro-WAF registra un evento por IP y minuto, aunque bloquee más peticiones.
+- El 2FA emite como máximo 5 códigos cada 10 minutos por usuario; los fallos de 2FA cuentan para el bloqueo por IP.

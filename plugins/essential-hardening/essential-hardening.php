@@ -491,6 +491,16 @@ final class Essential_Hardening {
 				return;
 			}
 
+			/**
+			 * Permite omitir el WAF en peticiones concretas (ej. un endpoint de un plugin que envía código en la URL).
+			 *
+			 * @param bool   $skip        True para no inspeccionar la petición.
+			 * @param string $request_uri URI solicitada.
+			 */
+			if ( apply_filters( 'essential_hardening_waf_skip', false, $request_uri ) ) {
+				return;
+			}
+
 			// Probar variaciones codificadas y decodificadas
 			$targets = array(
 				$query_string,
@@ -516,10 +526,23 @@ final class Essential_Hardening {
 				'/javascript\s*:/i',                   // JavaScript URI Scheme
 			);
 
+			/**
+			 * Permite añadir o quitar patrones del Micro-WAF (expresiones regulares PCRE).
+			 *
+			 * @param string[] $patterns Patrones activos.
+			 */
+			$patterns = (array) apply_filters( 'essential_hardening_waf_patterns', $patterns );
+			$targets  = array_values( array_unique( array_filter( $targets ) ) );
+
 			foreach ( $targets as $target ) {
 				foreach ( $patterns as $pattern ) {
 					if ( preg_match( $pattern, $target ) ) {
-						$this->log_security_event( 'Micro-WAF', $this->get_client_ip(), sprintf( __( 'Patrón sospechoso bloqueado: %s', 'essential-hardening' ), esc_html( substr( $target, 0, 70 ) ) ) );
+						// Un solo registro por IP y minuto: evita escrituras en BD por cada petición de un escáner
+						$ip_key = 'eh_waf_log_' . md5( $this->get_client_ip() );
+						if ( ! get_transient( $ip_key ) ) {
+							set_transient( $ip_key, 1, MINUTE_IN_SECONDS );
+							$this->log_security_event( 'Micro-WAF', $this->get_client_ip(), sprintf( __( 'Patrón sospechoso bloqueado: %s', 'essential-hardening' ), substr( $target, 0, 70 ) ) );
+						}
 						wp_die(
 							esc_html__( 'Petición bloqueada por reglas de seguridad (Micro-WAF).', 'essential-hardening' ),
 							esc_html__( 'Acceso Denegado (403)', 'essential-hardening' ),
@@ -602,11 +625,20 @@ final class Essential_Hardening {
 		$count_key   = 'eh_fail_count_' . md5( $ip );
 		$lockout_key = 'eh_lockout_' . md5( $ip );
 
+		// Si la IP ya está bloqueada no se suma ni se duerme: evita extender el bloqueo al usuario legítimo
+		// y que un atacante mantenga procesos PHP ocupados.
+		if ( get_transient( $lockout_key ) ) {
+			return;
+		}
+
 		$attempts = (int) get_transient( $count_key );
 		$attempts++;
 
-		// Retardo de 2 segundos para amortiguar ataques masivos de diccionario
-		sleep( 2 );
+		// Retardo corto para amortiguar ataques de diccionario (filtrable; 0 lo desactiva)
+		$delay = (int) apply_filters( 'essential_hardening_failed_login_delay', 2 );
+		if ( $delay > 0 ) {
+			sleep( min( $delay, 5 ) );
+		}
 
 		$max_attempts     = ! empty( $this->options['throttle_max_attempts'] ) ? absint( $this->options['throttle_max_attempts'] ) : 5;
 		$lockout_duration = ! empty( $this->options['throttle_lockout_duration'] ) ? absint( $this->options['throttle_lockout_duration'] ) : 900;
@@ -653,8 +685,6 @@ final class Essential_Hardening {
 		// Si es una petición POST de login y el campo honeypot viene completado, es un bot
 		if ( 'POST' === ( $_SERVER['REQUEST_METHOD'] ?? '' ) && ! empty( $_POST['eh_login_company'] ) ) {
 			$this->log_security_event( 'Honeypot Anti-Bot', $this->get_client_ip(), __( 'Bot bloqueado por completar campo invisible de login', 'essential-hardening' ) );
-			// Aplicar retardo disuasivo
-			sleep( 2 );
 
 			return new WP_Error(
 				'eh_bot_detected',
