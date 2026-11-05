@@ -2,7 +2,7 @@
 
 Suite modular, ultraligera y sin dependencias externas para el endurecimiento y seguridad perimetral integral de sitios WordPress.
 
-- **Versión:** 1.4.2
+- **Versión:** 1.5.0
 - **Licencia:** GPL-2.0-or-later
 - **Compatibilidad:** WordPress 5.8+ | PHP 7.4 - 8.3+
 
@@ -19,7 +19,7 @@ El plugin **Essential Hardening & Security** está diseñado bajo los principios
 
 ---
 
-## 2. Los 17 Módulos de Protección y Auditoría
+## 2. Los 19 Módulos de Protección y Auditoría
 
 ### 2.1. Micro-WAF / Cortafuegos de Peticiones y Query Strings
 Inspecciona tanto la cadena de consulta cruda (`QUERY_STRING`) como la decodificada en cada petición HTTP antes de que los componentes del núcleo o plugins comiencen su procesamiento:
@@ -78,7 +78,7 @@ Dificulta el escaneo automatizado de vulnerabilidades basadas en versión:
 Inyecta cabeceras defensivas estándar en la respuesta HTTP (`send_headers`):
 - `X-Frame-Options: SAMEORIGIN`: Protege contra ataques de clickjacking impidiendo que el sitio sea embebido en iframes de terceros.
 - `X-Content-Type-Options: nosniff`: Fuerza a los navegadores a respetar el tipo MIME declarado, evitando ejecución de código malicioso disfrazado.
-- `X-XSS-Protection: 0`: desactiva a propósito el filtro XSS de navegadores antiguos (obsoleto, puede introducir fallos). No se envían CSP ni HSTS: dependen de cada sitio.
+- `X-XSS-Protection: 0`: desactiva a propósito el filtro XSS de navegadores antiguos (obsoleto, puede introducir fallos). HSTS y CSP son módulos aparte y opcionales (2.18 y 2.19).
 - `Referrer-Policy: strict-origin-when-cross-origin`: Limita el envío de URLs de referencia a dominios externos.
 - `Permissions-Policy: camera=(), microphone=(), geolocation=()`: Desactiva permisos de hardware innecesarios.
 - `X-Pingback`: Remueve la cabecera para mitigar ataques de amplificación.
@@ -127,6 +127,18 @@ Visibilidad en tiempo real de los intentos maliciosos bloqueados:
 
 ---
 
+### 2.18. HSTS (Forzar HTTPS) — opcional, desde 1.5.0
+- Opción `hsts_enabled` (por defecto `false`) y `hsts_max_age` (por defecto 30 días; valores permitidos: 300, 86400, 2592000, 15552000, 31536000).
+- Solo se envía si la petición es HTTPS (`is_ssl()`): por HTTP el navegador la ignora.
+- `includeSubDomains` no se envía salvo que se active con el filtro `essential_hardening_hsts_include_subdomains`, porque rompe subdominios sin HTTPS válido.
+- No incluye `preload`: es prácticamente irreversible.
+
+### 2.19. Content-Security-Policy en modo solo-reporte — opcional, desde 1.5.0
+- Opción `csp_report_only` (por defecto `false`). Envía **solo** `Content-Security-Policy-Report-Only`; nunca la cabecera que bloquea.
+- Política por defecto compatible con un WordPress estándar (`'unsafe-inline'` y `'unsafe-eval'` en scripts, imágenes y fuentes por HTTPS). Se reemplaza con `essential_hardening_csp_policy`.
+- Los saltos de línea de la política se eliminan para impedir la inyección de cabeceras.
+- No hay endpoint de informes: las infracciones se ven en la consola del navegador.
+
 ## 3. Configuración en Base de Datos
 
 El plugin almacena sus preferencias en una única entrada en `wp_options`:
@@ -154,6 +166,9 @@ El plugin almacena sus preferencias en una única entrada en `wp_options`:
       'admin_login_alerts'        => true,
       'security_event_log'        => true,
       'email_2fa_enabled'         => false,
+      'hsts_enabled'              => false,
+      'hsts_max_age'              => 2592000,
+      'csp_report_only'           => false,
   )
   ```
 
@@ -174,12 +189,14 @@ Si deseas que el plugin se ejecute de forma obligatoria en un servidor y que nin
    ```
 3. WordPress lo ejecutará automáticamente antes de los plugins estándar.
 
-## 5. Filtros de Personalización (desde 1.4.2)
+## 5. Filtros de Personalización
 
 Se usan desde el tema hijo, un `mu-plugin` o un plugin propio. No hace falta editar este plugin.
 
 | Filtro | Para qué sirve |
 |--------|----------------|
+| `essential_hardening_hsts_include_subdomains` | Devolver `true` para añadir `includeSubDomains` a HSTS (solo si todos los subdominios tienen HTTPS válido). |
+| `essential_hardening_csp_policy` | Reemplazar la política CSP en modo solo-reporte. |
 | `essential_hardening_client_ip` | Resolver la IP real detrás de un proxy o CDN de confianza (ej. Cloudflare). Por defecto solo se usa `REMOTE_ADDR`, porque `X-Forwarded-For` se puede falsificar. |
 | `essential_hardening_failed_login_delay` | Segundos de retardo tras un login fallido (por defecto 2, máximo 5). `0` lo desactiva. |
 | `essential_hardening_waf_patterns` | Añadir o quitar expresiones regulares del Micro-WAF. |

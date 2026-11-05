@@ -3,7 +3,7 @@
  * Plugin Name:       Essential Hardening & Security
  * Plugin URI:        https://github.com/luiskaco/utilities_wordpress
  * Description:       Suite ligera, modular y de rendimiento cero para hardening en WordPress. Cortafuegos Micro-WAF, mitigación de fuerza bruta, protección de uploads, bloqueo de enumeración de usuarios, desactivación total de comentarios y spam, cabeceras HTTP defensivas y anonimización de huellas del CMS.
- * Version:           1.4.2
+ * Version:           1.5.0
  * Requires at least: 5.8
  * Requires PHP:      7.4
  * Author:            Web Security Tools
@@ -23,7 +23,7 @@ final class Essential_Hardening {
 	/**
 	 * Versión del plugin.
 	 */
-	public const VERSION = '1.4.2';
+	public const VERSION = '1.5.0';
 
 	/**
 	 * Máximo número de eventos de seguridad registrados en el mini-log.
@@ -200,6 +200,10 @@ final class Essential_Hardening {
 			'admin_login_alerts'        => true,
 			'security_event_log'        => true,
 			'email_2fa_enabled'         => false,
+			// Módulos v1.5.0 (HSTS y CSP en modo solo-reporte). Desactivados: dependen del sitio.
+			'hsts_enabled'              => false,
+			'hsts_max_age'              => 2592000,
+			'csp_report_only'           => false,
 		);
 	}
 
@@ -305,6 +309,11 @@ final class Essential_Hardening {
 		// 16. Doble Factor de Autenticación por Correo (v1.4.0)
 		if ( ! empty( $this->options['email_2fa_enabled'] ) ) {
 			$this->module_email_2fa();
+		}
+
+		// 17. HSTS y CSP en modo solo-reporte (v1.5.0)
+		if ( ! empty( $this->options['hsts_enabled'] ) || ! empty( $this->options['csp_report_only'] ) ) {
+			$this->module_transport_headers();
 		}
 
 		// Manejador para vaciar el mini-log de seguridad desde el panel
@@ -444,6 +453,91 @@ final class Essential_Hardening {
 			unset( $headers['X-Pingback'] );
 			return $headers;
 		} );
+	}
+
+	/* ======================================================================
+	   MÓDULO 18: HSTS y Content-Security-Policy en modo solo-reporte (v1.5.0)
+	   ====================================================================== */
+
+	/**
+	 * Valores de max-age permitidos para HSTS (segundos).
+	 *
+	 * @return int[]
+	 */
+	public static function get_hsts_max_age_choices(): array {
+		return array( 300, 86400, 2592000, 15552000, 31536000 );
+	}
+
+	private function module_transport_headers(): void {
+		add_action( 'send_headers', function (): void {
+			if ( headers_sent() ) {
+				return;
+			}
+			foreach ( $this->get_transport_headers() as $header ) {
+				header( $header );
+			}
+		} );
+	}
+
+	/**
+	 * Construye las cabeceras HSTS y CSP según la configuración.
+	 *
+	 * - HSTS solo se envía por HTTPS: por HTTP el navegador lo ignora y solo daría una falsa seguridad.
+	 * - La CSP va siempre en modo Report-Only: registra en la consola del navegador lo que bloquearía,
+	 *   pero no bloquea nada. Así se ve el impacto antes de endurecerla.
+	 *
+	 * @return string[] Líneas de cabecera completas.
+	 */
+	public function get_transport_headers(): array {
+		$headers = array();
+
+		if ( ! empty( $this->options['hsts_enabled'] ) && is_ssl() ) {
+			$max_age = absint( $this->options['hsts_max_age'] ?? 2592000 );
+			if ( ! in_array( $max_age, self::get_hsts_max_age_choices(), true ) ) {
+				$max_age = 2592000;
+			}
+
+			$value = 'max-age=' . $max_age;
+
+			/**
+			 * Añadir includeSubDomains a HSTS. Solo si TODOS los subdominios tienen HTTPS válido.
+			 *
+			 * @param bool $include_subdomains Por defecto false.
+			 */
+			if ( apply_filters( 'essential_hardening_hsts_include_subdomains', false ) ) {
+				$value .= '; includeSubDomains';
+			}
+
+			$headers[] = 'Strict-Transport-Security: ' . $value;
+		}
+
+		if ( ! empty( $this->options['csp_report_only'] ) ) {
+			$default_policy = "default-src 'self'; "
+				. "script-src 'self' 'unsafe-inline' 'unsafe-eval'; "
+				. "style-src 'self' 'unsafe-inline'; "
+				. "img-src 'self' data: https:; "
+				. "font-src 'self' data: https:; "
+				. "connect-src 'self'; "
+				. "frame-ancestors 'self'; "
+				. "base-uri 'self'; "
+				. "form-action 'self'";
+
+			/**
+			 * Política CSP en modo solo-reporte. Ajustarla a los dominios externos reales del sitio.
+			 *
+			 * @param string $policy Política por defecto, compatible con un WordPress estándar.
+			 */
+			$policy = (string) apply_filters( 'essential_hardening_csp_policy', $default_policy );
+
+			// Evitar saltos de línea que permitirían inyectar cabeceras adicionales
+			$policy = trim( preg_replace( '/[\r\n]+/', ' ', $policy ) );
+
+			if ( '' !== $policy ) {
+				$headers[] = 'Content-Security-Policy-Report-Only: ' . $policy;
+			}
+		}
+
+		return $headers;
 	}
 
 	/* ======================================================================
@@ -1317,6 +1411,10 @@ final class Essential_Hardening {
 			$sanitized['throttle_lockout_duration'] = 900;
 		}
 
+		if ( ! in_array( $sanitized['hsts_max_age'], self::get_hsts_max_age_choices(), true ) ) {
+			$sanitized['hsts_max_age'] = 2592000;
+		}
+
 		// Sanitizar email para notificaciones
 		$sanitized['update_notify_email'] = ! empty( $input['update_notify_email'] ) ? sanitize_email( $input['update_notify_email'] ) : '';
 
@@ -1614,6 +1712,42 @@ final class Essential_Hardening {
 									<span class="eh-tag eh-tag-firewall"><?php esc_html_e( 'Headers', 'essential-hardening' ); ?></span>
 								</div>
 								<p class="eh-item-desc"><?php esc_html_e( 'Inyecta X-Frame-Options (anti-clickjacking), X-Content-Type-Options: nosniff, Referrer-Policy y Permissions-Policy en cada respuesta HTTP. No incluye CSP ni HSTS: dependen de cada sitio.', 'essential-hardening' ); ?></p>
+							</div>
+						</div>
+
+						<!-- HSTS -->
+						<div class="eh-item">
+							<input type="checkbox" id="eh_hsts_enabled" name="<?php echo esc_attr( self::OPTION_NAME ); ?>[hsts_enabled]" value="1" <?php checked( $options['hsts_enabled'] ); ?>>
+							<div class="eh-item-body">
+								<div class="eh-item-title-row">
+									<label for="eh_hsts_enabled" class="eh-item-label"><?php esc_html_e( 'HSTS (Forzar HTTPS)', 'essential-hardening' ); ?></label>
+									<span class="eh-tag eh-tag-firewall"><?php esc_html_e( 'Headers', 'essential-hardening' ); ?></span>
+								</div>
+								<p class="eh-item-desc"><?php esc_html_e( 'Ordena al navegador usar solo HTTPS en este sitio. Se envía únicamente en conexiones HTTPS. Actívalo solo si el certificado SSL es válido y está renovando bien: si caduca, los visitantes no podrán entrar.', 'essential-hardening' ); ?></p>
+								<div class="eh-sub-settings">
+									<div class="eh-sub-setting">
+										<label for="eh_hsts_max_age"><?php esc_html_e( 'Duración:', 'essential-hardening' ); ?></label>
+										<select id="eh_hsts_max_age" name="<?php echo esc_attr( self::OPTION_NAME ); ?>[hsts_max_age]">
+											<option value="300" <?php selected( $options['hsts_max_age'], 300 ); ?>><?php esc_html_e( '5 minutos (prueba)', 'essential-hardening' ); ?></option>
+											<option value="86400" <?php selected( $options['hsts_max_age'], 86400 ); ?>><?php esc_html_e( '1 día', 'essential-hardening' ); ?></option>
+											<option value="2592000" <?php selected( $options['hsts_max_age'], 2592000 ); ?>><?php esc_html_e( '30 días (Recomendado)', 'essential-hardening' ); ?></option>
+											<option value="15552000" <?php selected( $options['hsts_max_age'], 15552000 ); ?>><?php esc_html_e( '6 meses', 'essential-hardening' ); ?></option>
+											<option value="31536000" <?php selected( $options['hsts_max_age'], 31536000 ); ?>><?php esc_html_e( '1 año', 'essential-hardening' ); ?></option>
+										</select>
+									</div>
+								</div>
+							</div>
+						</div>
+
+						<!-- CSP solo-reporte -->
+						<div class="eh-item">
+							<input type="checkbox" id="eh_csp_report_only" name="<?php echo esc_attr( self::OPTION_NAME ); ?>[csp_report_only]" value="1" <?php checked( $options['csp_report_only'] ); ?>>
+							<div class="eh-item-body">
+								<div class="eh-item-title-row">
+									<label for="eh_csp_report_only" class="eh-item-label"><?php esc_html_e( 'CSP en modo solo-reporte', 'essential-hardening' ); ?></label>
+									<span class="eh-tag eh-tag-firewall"><?php esc_html_e( 'Headers', 'essential-hardening' ); ?></span>
+								</div>
+								<p class="eh-item-desc"><?php esc_html_e( 'Envía una Content-Security-Policy que NO bloquea nada: el navegador solo anota en su consola (F12) qué recursos externos incumplirían la política. Sirve para ver el impacto antes de endurecer.', 'essential-hardening' ); ?></p>
 							</div>
 						</div>
 

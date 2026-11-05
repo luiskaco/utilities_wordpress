@@ -2,13 +2,13 @@
 
 Suite ultraligera, modular y sin dependencias para el endurecimiento (*hardening*) y protección perimetral de cualquier instalación WordPress. Diseñada para proteger portales institucionales, blogs, tiendas o sitios corporativos con cero sobrecarga técnica y sin tablas adicionales en base de datos.
 
-- **Versión:** 1.4.2
+- **Versión:** 1.5.0
 - **Licencia:** GPL-2.0-or-later
 - **Dependencias:** Cero (PHP nativo + Hooks de WordPress)
 
 ---
 
-## 🛡️ Los 17 Escudos y Herramientas de Seguridad
+## 🛡️ Los 19 Escudos y Herramientas de Seguridad
 
 ### 1. Cortafuegos de Peticiones y Query Strings (Micro-WAF)
 - Inspecciona en tiempo real las cadenas de consulta (`$_SERVER['QUERY_STRING']` y `$_SERVER['REQUEST_URI']`).
@@ -101,13 +101,22 @@ Suite ultraligera, modular y sin dependencias para el endurecimiento (*hardening
 
 ---
 
+### 18. HSTS (Forzar HTTPS) — opcional
+- Envía `Strict-Transport-Security` solo en conexiones HTTPS, con la duración que elijas (5 minutos, 1 día, 30 días, 6 meses o 1 año).
+- Viene **desactivado**. Actívalo solo con un certificado SSL válido y renovándose bien: si caduca con HSTS activo, los visitantes no podrán entrar hasta que se renueve.
+- Recomendado: empezar con 5 minutos, comprobar que todo funciona y subir la duración.
+
+### 19. CSP en modo solo-reporte — opcional
+- Envía `Content-Security-Policy-Report-Only`: **no bloquea nada**. El navegador anota en su consola (F12) qué recursos incumplirían la política.
+- Viene **desactivado**. Úsalo para ver el impacto antes de endurecer; la política se ajusta con el filtro `essential_hardening_csp_policy`.
+
 ## 🚀 Instalación en Cualquier Proyecto WordPress
 
 ### Opción A: Como Plugin Estándar
 1. Copia la carpeta `essential-hardening` dentro de `wp-content/plugins/`.
 2. Ve a **Plugins > Plugins Instalados** en tu panel de WordPress.
 3. Haz clic en **Activar**.
-4. Puedes ajustar o activar/desactivar cualquiera de los 17 escudos en **Ajustes > Seguridad Esencial**.
+4. Puedes ajustar o activar/desactivar cualquiera de los 19 escudos en **Ajustes > Seguridad Esencial**.
 
 ### Opción B: Como Plugin Obligatorio (*Must-Use*)
 1. Copia el archivo `essential-hardening.php` o crea un cargador en `wp-content/mu-plugins/`.

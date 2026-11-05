@@ -274,6 +274,47 @@ try {
 	@unlink( $ht );
 	@rmdir( $tmp );
 
+	// -----------------------------------------------------------------------
+	eh_section( 'HSTS y CSP en modo solo-reporte' );
+	// -----------------------------------------------------------------------
+	// is_ssl() lee $_SERVER['HTTPS']
+	unset( $_SERVER['HTTPS'] );
+	eh_set_options( $eh, array( 'hsts_enabled' => true, 'hsts_max_age' => 86400, 'csp_report_only' => false ) );
+	eh_assert( array() === $eh->get_transport_headers(), 'HSTS NO se envía por HTTP' );
+
+	$_SERVER['HTTPS'] = 'on';
+	eh_assert( array( 'Strict-Transport-Security: max-age=86400' ) === $eh->get_transport_headers(), 'HSTS se envía por HTTPS con el max-age configurado' );
+
+	eh_set_options( $eh, array( 'hsts_enabled' => true, 'hsts_max_age' => 999 ) );
+	eh_assert( array( 'Strict-Transport-Security: max-age=2592000' ) === $eh->get_transport_headers(), 'un max-age no permitido cae al valor seguro de 30 días' );
+
+	add_filter( 'essential_hardening_hsts_include_subdomains', '__return_true' );
+	eh_assert( false !== strpos( $eh->get_transport_headers()[0], 'includeSubDomains' ), 'includeSubDomains solo con el filtro' );
+	remove_all_filters( 'essential_hardening_hsts_include_subdomains' );
+
+	eh_set_options( $eh, array( 'hsts_enabled' => false, 'csp_report_only' => true ) );
+	$h = $eh->get_transport_headers();
+	eh_assert( 1 === count( $h ) && 0 === strpos( $h[0], 'Content-Security-Policy-Report-Only: ' ), 'la CSP se envía SOLO como Report-Only (nunca bloquea)' );
+	eh_assert( false === strpos( $h[0], 'Content-Security-Policy: ' ), 'no existe la cabecera CSP que bloquea' );
+
+	add_filter( 'essential_hardening_csp_policy', function () {
+		return "default-src 'self'
+Set-Cookie: x=1";
+	} );
+	$h = $eh->get_transport_headers();
+	eh_assert( 1 === count( $h ) && false === strpbrk( $h[0], "
+" ), 'saltos de línea en la política no inyectan cabeceras' );
+	remove_all_filters( 'essential_hardening_csp_policy' );
+
+	eh_set_options( $eh, array( 'hsts_enabled' => false, 'csp_report_only' => false ) );
+	eh_assert( array() === $eh->get_transport_headers(), 'con ambas opciones apagadas no se envía nada (defecto)' );
+
+	$clean = $eh->sanitize_settings( array( 'hsts_enabled' => '1', 'hsts_max_age' => '7' ) );
+	eh_assert( true === $clean['hsts_enabled'] && 2592000 === $clean['hsts_max_age'], 'el guardado de ajustes valida el max-age' );
+	$clean = $eh->sanitize_settings( array() );
+	eh_assert( false === $clean['hsts_enabled'] && false === $clean['csp_report_only'], 'al guardar sin marcar, HSTS y CSP quedan apagados' );
+	unset( $_SERVER['HTTPS'] );
+
 } finally {
 	// Restaurar el estado del sitio local
 	remove_all_filters( 'pre_wp_mail' );
