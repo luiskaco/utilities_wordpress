@@ -3,7 +3,7 @@
  * Plugin Name:       Essential Hardening & Security
  * Plugin URI:        https://github.com/luiskaco/utilities_wordpress
  * Description:       Suite ligera, modular y de rendimiento cero para hardening en WordPress. Cortafuegos Micro-WAF, mitigación de fuerza bruta, protección de uploads, bloqueo de enumeración de usuarios, desactivación total de comentarios y spam, cabeceras HTTP defensivas y anonimización de huellas del CMS.
- * Version:           1.4.1
+ * Version:           1.4.2
  * Requires at least: 5.8
  * Requires PHP:      7.4
  * Author:            Web Security Tools
@@ -23,7 +23,7 @@ final class Essential_Hardening {
 	/**
 	 * Versión del plugin.
 	 */
-	public const VERSION = '1.4.1';
+	public const VERSION = '1.4.2';
 
 	/**
 	 * Máximo número de eventos de seguridad registrados en el mini-log.
@@ -656,15 +656,21 @@ final class Essential_Hardening {
 		$marker_start  = '# BEGIN Essential Hardening Uploads Protection';
 		$marker_end    = '# END Essential Hardening Uploads Protection';
 
+		// Apache 2.4 usa Require; Order/Deny solo se emite si existe mod_access_compat (evita error 500).
+		$match  = '"(?i)\\.(php|phtml|php3|php4|php5|php7|phps|phar|inc)$"';
 		$rules  = $marker_start . "\n";
-		$rules .= "<FilesMatch \"(?i)\\.(php|phtml|php3|php4|php5|php7|phps|phar|inc)$\">\n";
-		$rules .= "    Order Deny,Allow\n";
-		$rules .= "    Deny from all\n";
-		$rules .= "</FilesMatch>\n";
 		$rules .= "<IfModule mod_authz_core.c>\n";
-		$rules .= "    <FilesMatch \"(?i)\\.(php|phtml|php3|php4|php5|php7|phps|phar|inc)$\">\n";
+		$rules .= "    <FilesMatch {$match}>\n";
 		$rules .= "        Require all denied\n";
 		$rules .= "    </FilesMatch>\n";
+		$rules .= "</IfModule>\n";
+		$rules .= "<IfModule !mod_authz_core.c>\n";
+		$rules .= "    <IfModule mod_access_compat.c>\n";
+		$rules .= "        <FilesMatch {$match}>\n";
+		$rules .= "            Order Deny,Allow\n";
+		$rules .= "            Deny from all\n";
+		$rules .= "        </FilesMatch>\n";
+		$rules .= "    </IfModule>\n";
 		$rules .= "</IfModule>\n";
 		$rules .= $marker_end . "\n";
 
@@ -672,6 +678,15 @@ final class Essential_Hardening {
 			$content = (string) file_get_contents( $htaccess_file );
 			if ( false === strpos( $content, $marker_start ) ) {
 				file_put_contents( $htaccess_file, $content . "\n\n" . $rules );
+			} elseif ( false === strpos( $content, $rules ) ) {
+				// Migrar el bloque de versiones anteriores a la 1.4.2 (daba error 500 sin mod_access_compat).
+				$pattern = '/' . preg_quote( $marker_start, '/' ) . '.*?' . preg_quote( $marker_end, '/' ) . '\R?/s';
+				$updated = preg_replace_callback( $pattern, static function () use ( $rules ): string {
+					return $rules;
+				}, $content, 1 );
+				if ( null !== $updated ) {
+					file_put_contents( $htaccess_file, $updated );
+				}
 			}
 		} else {
 			file_put_contents( $htaccess_file, $rules );
@@ -1009,11 +1024,6 @@ final class Essential_Hardening {
 
 		// Solo en peticiones POST de wp-login.php (evita interferir en CLI, Cron, REST API)
 		if ( 'POST' !== ( $_SERVER['REQUEST_METHOD'] ?? '' ) || empty( $_POST['log'] ) ) {
-			return $user;
-		}
-
-		// Si ya fue validado por 2FA, continuar
-		if ( ! empty( $_POST['eh_2fa_verified'] ) ) {
 			return $user;
 		}
 
