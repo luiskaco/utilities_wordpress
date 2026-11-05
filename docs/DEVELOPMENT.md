@@ -30,7 +30,7 @@ php tests/essential-hardening/run.php
 ```
 
 - Hace falta activar el plugin en el WordPress local y tener PHP con `mysqli` (el `php.ini` de Laragon lo trae).
-- Si `php` no está en el PATH: `C:\laragonin\php\php-8.3.x-Win32-vs16-x64\php.exe`.
+- Si `php` no está en el PATH: `C:\laragon\bin\php\php-8.3.x-Win32-vs16-x64\php.exe`.
 - El script se niega a correr si el host no termina en `.test`, `.local` o `localhost`. Se cambia con `EH_TEST_HOST`.
 - Cubre el 2FA (incluye la regresión del bypass `eh_2fa_verified`), el bloqueo de login, el honeypot y el `.htaccess` de uploads.
 - Sale con código 1 si alguna prueba falla.
