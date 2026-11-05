@@ -2,13 +2,13 @@
 
 Suite ultraligera, modular y sin dependencias para el endurecimiento (*hardening*) y protección perimetral de cualquier instalación WordPress. Diseñada para proteger portales institucionales, blogs, tiendas o sitios corporativos con cero sobrecarga técnica y sin tablas adicionales en base de datos.
 
-- **Versión:** 1.5.0
+- **Versión:** 1.6.0
 - **Licencia:** GPL-2.0-or-later
 - **Dependencias:** Cero (PHP nativo + Hooks de WordPress)
 
 ---
 
-## 🛡️ Los 19 Escudos y Herramientas de Seguridad
+## 🛡️ Los 21 Escudos y Herramientas de Seguridad
 
 ### 1. Cortafuegos de Peticiones y Query Strings (Micro-WAF)
 - Inspecciona en tiempo real las cadenas de consulta (`$_SERVER['QUERY_STRING']` y `$_SERVER['REQUEST_URI']`).
@@ -110,13 +110,25 @@ Suite ultraligera, modular y sin dependencias para el endurecimiento (*hardening
 - Envía `Content-Security-Policy-Report-Only`: **no bloquea nada**. El navegador anota en su consola (F12) qué recursos incumplirían la política.
 - Viene **desactivado**. Úsalo para ver el impacto antes de endurecer; la política se ajusta con el filtro `essential_hardening_csp_policy`.
 
+### 20. Alertas de Administradores Nuevos o Promovidos
+- Envía un correo cuando se crea un usuario **Administrador** o se le da ese rol a una cuenta existente. Indica el usuario afectado, quién hizo el cambio, la IP y la hora.
+- Crear un administrador oculto es una de las primeras cosas que hace un atacante para poder volver a entrar. Viene **activado**.
+- Un mismo usuario no genera más de un aviso cada 5 minutos. Bajar a alguien de Administrador no avisa. El cambio queda también en el registro de eventos.
+
+### 21. Verificación de Integridad del Núcleo de WordPress — opcional
+- Cada día compara los archivos de WordPress (`wp-admin`, `wp-includes` y la raíz) con las **sumas de control oficiales** de WordPress.org y avisa por correo si algún archivo fue **modificado**, **falta** o hay **archivos PHP que no son de WordPress** (típico de una puerta trasera).
+- No revisa `wp-content` (temas, plugins y subidas son propios de cada sitio) ni `wp-config.php`.
+- Botón **Verificar ahora** en el panel, con el resultado de la última comprobación.
+- Viene **desactivado** porque consulta `api.wordpress.org` una vez al día. Solo se envían la versión y el idioma de WordPress, igual que hace el propio WordPress para actualizarse.
+- No avisa por `readme.html`, `license.txt` ni `wp-config-sample.php` ausentes, porque muchos hostings los borran a propósito.
+
 ## 🚀 Instalación en Cualquier Proyecto WordPress
 
 ### Opción A: Como Plugin Estándar
 1. Copia la carpeta `essential-hardening` dentro de `wp-content/plugins/`.
 2. Ve a **Plugins > Plugins Instalados** en tu panel de WordPress.
 3. Haz clic en **Activar**.
-4. Puedes ajustar o activar/desactivar cualquiera de los 19 escudos en **Ajustes > Seguridad Esencial**.
+4. Puedes ajustar o activar/desactivar cualquiera de los 21 escudos en **Ajustes > Seguridad Esencial**.
 
 ### Opción B: Como Plugin Obligatorio (*Must-Use*)
 1. Copia el archivo `essential-hardening.php` o crea un cargador en `wp-content/mu-plugins/`.

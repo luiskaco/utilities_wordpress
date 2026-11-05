@@ -3,7 +3,7 @@
  * Plugin Name:       Essential Hardening & Security
  * Plugin URI:        https://github.com/luiskaco/utilities_wordpress
  * Description:       Suite ligera, modular y de rendimiento cero para hardening en WordPress. Cortafuegos Micro-WAF, mitigación de fuerza bruta, protección de uploads, bloqueo de enumeración de usuarios, desactivación total de comentarios y spam, cabeceras HTTP defensivas y anonimización de huellas del CMS.
- * Version:           1.5.0
+ * Version:           1.6.0
  * Requires at least: 5.8
  * Requires PHP:      7.4
  * Author:            Web Security Tools
@@ -23,7 +23,7 @@ final class Essential_Hardening {
 	/**
 	 * Versión del plugin.
 	 */
-	public const VERSION = '1.5.0';
+	public const VERSION = '1.6.0';
 
 	/**
 	 * Máximo número de eventos de seguridad registrados en el mini-log.
@@ -54,6 +54,7 @@ final class Essential_Hardening {
 	 */
 	public static function on_deactivation(): void {
 		wp_clear_scheduled_hook( 'eh_daily_update_check_cron' );
+		wp_clear_scheduled_hook( 'eh_daily_core_integrity_cron' );
 
 		$upload_dir = wp_upload_dir();
 		$htaccess   = isset( $upload_dir['basedir'] ) ? trailingslashit( $upload_dir['basedir'] ) . '.htaccess' : '';
@@ -204,6 +205,9 @@ final class Essential_Hardening {
 			'hsts_enabled'              => false,
 			'hsts_max_age'              => 2592000,
 			'csp_report_only'           => false,
+			// Módulos v1.6.0 (cambios de administradores e integridad del núcleo)
+			'admin_change_alerts'       => true,
+			'core_integrity_check'      => false,
 		);
 	}
 
@@ -314,6 +318,18 @@ final class Essential_Hardening {
 		// 17. HSTS y CSP en modo solo-reporte (v1.5.0)
 		if ( ! empty( $this->options['hsts_enabled'] ) || ! empty( $this->options['csp_report_only'] ) ) {
 			$this->module_transport_headers();
+		}
+
+		// 18. Alertas de administradores nuevos o con rol elevado (v1.6.0)
+		if ( ! empty( $this->options['admin_change_alerts'] ) ) {
+			$this->module_admin_change_alerts();
+		}
+
+		// 19. Verificación de integridad de los archivos del núcleo (v1.6.0)
+		if ( ! empty( $this->options['core_integrity_check'] ) ) {
+			$this->module_core_integrity();
+		} elseif ( wp_next_scheduled( 'eh_daily_core_integrity_cron' ) ) {
+			wp_clear_scheduled_hook( 'eh_daily_core_integrity_cron' );
 		}
 
 		// Manejador para vaciar el mini-log de seguridad desde el panel
@@ -1360,6 +1376,366 @@ final class Essential_Hardening {
 	}
 
 	/* ======================================================================
+	   MÓDULO 18: Alertas de Administradores Nuevos o con Rol Elevado (v1.6.0)
+	   ====================================================================== */
+
+	private function module_admin_change_alerts(): void {
+		add_action( 'user_register', array( $this, 'on_user_registered' ), 99, 1 );
+		add_action( 'set_user_role', array( $this, 'on_user_role_set' ), 99, 3 );
+		add_action( 'add_user_role', array( $this, 'on_user_role_added' ), 99, 2 );
+	}
+
+	/**
+	 * Destinatario de las alertas: el correo configurado o el del administrador del sitio.
+	 */
+	private function get_alert_recipient(): string {
+		$recipient = ! empty( $this->options['update_notify_email'] ) ? sanitize_email( $this->options['update_notify_email'] ) : '';
+		if ( ! is_email( $recipient ) ) {
+			$recipient = (string) get_option( 'admin_email' );
+		}
+		return $recipient;
+	}
+
+	public function on_user_registered( $user_id ): void {
+		$user = get_userdata( (int) $user_id );
+		if ( $user instanceof WP_User && in_array( 'administrator', (array) $user->roles, true ) ) {
+			$this->notify_admin_change( $user, __( 'Se creó un usuario con rol Administrador', 'essential-hardening' ) );
+		}
+	}
+
+	public function on_user_role_set( $user_id, $role, $old_roles ): void {
+		if ( 'administrator' === $role && ! in_array( 'administrator', (array) $old_roles, true ) ) {
+			$user = get_userdata( (int) $user_id );
+			if ( $user instanceof WP_User ) {
+				$this->notify_admin_change( $user, __( 'Un usuario fue promovido a Administrador', 'essential-hardening' ) );
+			}
+		}
+	}
+
+	public function on_user_role_added( $user_id, $role ): void {
+		if ( 'administrator' === $role ) {
+			$user = get_userdata( (int) $user_id );
+			if ( $user instanceof WP_User ) {
+				$this->notify_admin_change( $user, __( 'Se añadió el rol Administrador a un usuario', 'essential-hardening' ) );
+			}
+		}
+	}
+
+	private function notify_admin_change( WP_User $target, string $headline ): void {
+		// Un mismo usuario no genera más de un aviso cada 5 minutos (crear + asignar rol dispara varios hooks)
+		$dedupe_key = 'eh_admin_change_' . $target->ID;
+		if ( get_transient( $dedupe_key ) ) {
+			return;
+		}
+		set_transient( $dedupe_key, 1, 5 * MINUTE_IN_SECONDS );
+
+		$actor      = wp_get_current_user();
+		$actor_name = ( $actor instanceof WP_User && $actor->exists() ) ? $actor->user_login : __( 'ninguno (WP-CLI, tarea programada o petición sin sesión)', 'essential-hardening' );
+		$site_name  = wp_specialchars_decode( get_option( 'blogname' ), ENT_QUOTES );
+		$ip         = $this->get_client_ip();
+
+		$this->log_security_event(
+			'Cambio de Admin',
+			$ip,
+			/* translators: 1: usuario afectado, 2: usuario que hizo el cambio */
+			sprintf( __( '%1$s es Administrador (cambio hecho por: %2$s)', 'essential-hardening' ), $target->user_login, $actor_name )
+		);
+
+		$subject = sprintf(
+			/* translators: %s: nombre del sitio */
+			__( '[Alerta de Seguridad] Cambio de administradores en %s', 'essential-hardening' ),
+			$site_name
+		);
+
+		$message  = "Hola,\n\n";
+		$message .= $headline . " en tu sitio " . $site_name . ":\n\n";
+		$message .= sprintf( "● Usuario afectado: %s (%s)\n", $target->user_login, $target->user_email );
+		$message .= sprintf( "● Cambio hecho por: %s\n", $actor_name );
+		$message .= sprintf( "● Fecha y Hora: %s\n", current_time( 'Y-m-d H:i:s' ) );
+		$message .= sprintf( "● Dirección IP: %s\n\n", $ip );
+		$message .= "Si lo hiciste tú, puedes ignorar este correo.\n";
+		$message .= "Si NO reconoces este cambio, revisa los usuarios y cambia las contraseñas de inmediato:\n";
+		$message .= admin_url( 'users.php?role=administrator' ) . "\n\n";
+		$message .= "--\nNotificación enviada por Essential Hardening & Security.";
+
+		$this->safe_wp_mail( $this->get_alert_recipient(), $subject, $message, array( 'Content-Type: text/plain; charset=UTF-8' ) );
+	}
+
+	/* ======================================================================
+	   MÓDULO 19: Integridad de los Archivos del Núcleo de WordPress (v1.6.0)
+	   ====================================================================== */
+
+	/**
+	 * Máximo de archivos que se listan por categoría (correo y panel).
+	 */
+	public const MAX_INTEGRITY_FILES_LISTED = 25;
+
+	private function module_core_integrity(): void {
+		if ( ! wp_next_scheduled( 'eh_daily_core_integrity_cron' ) ) {
+			wp_schedule_event( time() + ( 2 * HOUR_IN_SECONDS ), 'daily', 'eh_daily_core_integrity_cron' );
+		}
+
+		add_action( 'eh_daily_core_integrity_cron', array( $this, 'run_core_integrity_check' ) );
+
+		if ( is_admin() ) {
+			add_action( 'admin_post_eh_verify_core', array( $this, 'handle_verify_core_now' ) );
+		}
+	}
+
+	/**
+	 * Compara los archivos del núcleo con las sumas de control oficiales.
+	 *
+	 * - modified:   existe pero su contenido no coincide con el oficial.
+	 * - missing:    figura en la lista oficial pero no existe.
+	 * - unexpected: archivo PHP que no pertenece al núcleo (raíz, wp-admin o wp-includes).
+	 *
+	 * wp-content no se revisa (temas, plugins y subidas son propios de cada sitio).
+	 *
+	 * @param array<string, string|false> $checksums Mapa ruta relativa => md5 oficial. Un valor false indica "existe pero no se compara".
+	 * @param string                $root      Directorio raíz de WordPress.
+	 * @return array{modified: string[], missing: string[], unexpected: string[]}
+	 */
+	public function compare_core_files( array $checksums, string $root ): array {
+		$root   = rtrim( str_replace( '\\', '/', $root ), '/' );
+		$result = array(
+			'modified'   => array(),
+			'missing'    => array(),
+			'unexpected' => array(),
+		);
+
+		/**
+		 * Rutas relativas que se ignoran en la verificación. Por defecto, archivos que muchos hostings
+		 * o guías de hardening eliminan a propósito.
+		 *
+		 * @param string[] $ignore Lista de rutas relativas al directorio raíz.
+		 */
+		$ignore = (array) apply_filters(
+			'essential_hardening_core_integrity_ignore',
+			array( 'readme.html', 'license.txt', 'wp-config-sample.php', 'wp-admin/install.php' )
+		);
+
+		foreach ( $checksums as $file => $expected ) {
+			if ( 0 === strpos( $file, 'wp-content/' ) || in_array( $file, $ignore, true ) || ! is_string( $expected ) ) {
+				continue;
+			}
+
+			$path = $root . '/' . $file;
+			if ( ! is_file( $path ) ) {
+				$result['missing'][] = $file;
+				continue;
+			}
+
+			if ( md5_file( $path ) !== $expected ) {
+				$result['modified'][] = $file;
+			}
+		}
+
+		// Archivos ejecutables que no son del núcleo: típico de puertas traseras (webshells)
+		$is_executable = static function ( string $name ): bool {
+			return (bool) preg_match( '/\.(php|phtml|phar|php[3-8])$/i', $name );
+		};
+
+		foreach ( glob( $root . '/*' ) ?: array() as $path ) {
+			$name = basename( $path );
+			if ( is_file( $path ) && $is_executable( $name ) && ! isset( $checksums[ $name ] ) && 'wp-config.php' !== $name ) {
+				$result['unexpected'][] = $name;
+			}
+		}
+
+		foreach ( array( 'wp-admin', 'wp-includes' ) as $dir ) {
+			if ( ! is_dir( $root . '/' . $dir ) ) {
+				continue;
+			}
+			$iterator = new RecursiveIteratorIterator(
+				new RecursiveDirectoryIterator( $root . '/' . $dir, FilesystemIterator::SKIP_DOTS )
+			);
+			foreach ( $iterator as $fileinfo ) {
+				if ( ! $fileinfo->isFile() || ! $is_executable( $fileinfo->getFilename() ) ) {
+					continue;
+				}
+				$relative = ltrim( substr( str_replace( '\\', '/', $fileinfo->getPathname() ), strlen( $root ) ), '/' );
+				if ( ! isset( $checksums[ $relative ] ) ) {
+					$result['unexpected'][] = $relative;
+				}
+			}
+		}
+
+		sort( $result['modified'] );
+		sort( $result['missing'] );
+		sort( $result['unexpected'] );
+
+		return $result;
+	}
+
+	/**
+	 * Descarga las sumas de control oficiales para la versión y el idioma instalados.
+	 * Hace UNA petición a api.wordpress.org (la misma que usa WordPress y WP-CLI).
+	 *
+	 * @return array<string, string>|false
+	 */
+	private function fetch_core_checksums() {
+		/**
+		 * Permite proveer las sumas de control (pruebas o entornos sin salida a internet).
+		 *
+		 * @param array|false|null $checksums Null para usar la API oficial; false para simular que no está disponible.
+		 */
+		$custom = apply_filters( 'essential_hardening_core_checksums', null );
+		if ( is_array( $custom ) || false === $custom ) {
+			return $custom;
+		}
+
+		if ( ! function_exists( 'get_core_checksums' ) ) {
+			require_once ABSPATH . 'wp-admin/includes/update.php';
+		}
+
+		global $wp_version;
+		$checksums = get_core_checksums( $wp_version, get_locale() );
+		if ( ! is_array( $checksums ) && 'en_US' !== get_locale() ) {
+			// Hay idiomas sin lista propia (ej. es_PE): se usa la de inglés. version.php cambia según el
+			// paquete de idioma instalado: se marca con false para no compararlo (sin que cuente como archivo ajeno).
+			$checksums = get_core_checksums( $wp_version, 'en_US' );
+			if ( is_array( $checksums ) ) {
+				$checksums['wp-includes/version.php'] = false;
+			}
+		}
+
+		return is_array( $checksums ) ? $checksums : false;
+	}
+
+	/**
+	 * Ejecuta la verificación, guarda el resultado y avisa por correo si cambió algo.
+	 *
+	 * @param bool $notify False para no enviar correo (verificación manual desde el panel).
+	 * @return array<string, mixed> Resultado guardado.
+	 */
+	public function run_core_integrity_check( bool $notify = true ): array {
+		// Leer unos 3.500 archivos puede tardar en discos lentos: se amplía el límite igual que hace WordPress en sus tareas largas.
+		if ( function_exists( 'set_time_limit' ) ) {
+			@set_time_limit( 300 ); // phpcs:ignore Generic.PHP.NoSilencedErrors.Discouraged
+		}
+
+		$checksums = $this->fetch_core_checksums();
+
+		if ( false === $checksums ) {
+			$report = array(
+				'time'   => time(),
+				'status' => 'unavailable',
+			);
+			update_option( 'eh_core_integrity_last', $report, false );
+			return $report;
+		}
+
+		/**
+		 * Directorio raíz de WordPress a verificar (por defecto ABSPATH). Útil en instalaciones con el núcleo en otra carpeta.
+		 *
+		 * @param string $root Ruta sin barra final.
+		 */
+		$root  = (string) apply_filters( 'essential_hardening_core_root', untrailingslashit( ABSPATH ) );
+		$found = $this->compare_core_files( $checksums, $root );
+		$total = count( $found['modified'] ) + count( $found['missing'] ) + count( $found['unexpected'] );
+
+		$report = array(
+			'time'       => time(),
+			'status'     => 0 === $total ? 'clean' : 'issues',
+			'modified'   => $found['modified'],
+			'missing'    => $found['missing'],
+			'unexpected' => $found['unexpected'],
+		);
+		update_option( 'eh_core_integrity_last', $report, false );
+
+		if ( 0 === $total ) {
+			delete_transient( 'eh_last_core_alert_hash' );
+			return $report;
+		}
+
+		$this->log_security_event(
+			'Integridad',
+			$this->get_client_ip(),
+			sprintf(
+				/* translators: 1: modificados, 2: faltantes, 3: inesperados */
+				__( 'Núcleo alterado: %1$d modificados, %2$d faltantes, %3$d inesperados', 'essential-hardening' ),
+				count( $found['modified'] ),
+				count( $found['missing'] ),
+				count( $found['unexpected'] )
+			)
+		);
+
+		// Mismo hallazgo = un solo correo (se repite como mucho una vez por semana)
+		$hash = md5( wp_json_encode( $found ) );
+		if ( $notify && get_transient( 'eh_last_core_alert_hash' ) !== $hash ) {
+			$this->send_core_integrity_email( $found );
+			set_transient( 'eh_last_core_alert_hash', $hash, WEEK_IN_SECONDS );
+		}
+
+		return $report;
+	}
+
+	/**
+	 * @param array{modified: string[], missing: string[], unexpected: string[]} $found Hallazgos.
+	 */
+	private function send_core_integrity_email( array $found ): void {
+		$site_name = wp_specialchars_decode( get_option( 'blogname' ), ENT_QUOTES );
+
+		$subject = sprintf(
+			/* translators: %s: nombre del sitio */
+			__( '[Alerta de Seguridad] Archivos del núcleo de WordPress alterados en %s', 'essential-hardening' ),
+			$site_name
+		);
+
+		$sections = array(
+			'modified'   => __( 'MODIFICADOS (su contenido no coincide con el oficial)', 'essential-hardening' ),
+			'unexpected' => __( 'INESPERADOS (archivos PHP que no pertenecen a WordPress)', 'essential-hardening' ),
+			'missing'    => __( 'FALTANTES', 'essential-hardening' ),
+		);
+
+		$message  = "Hola,\n\n";
+		$message .= sprintf( "Essential Hardening comparó los archivos de WordPress de %s con las sumas de control oficiales y encontró diferencias:\n\n", $site_name );
+
+		foreach ( $sections as $key => $label ) {
+			if ( empty( $found[ $key ] ) ) {
+				continue;
+			}
+			$message .= sprintf( "● %s: %d\n", $label, count( $found[ $key ] ) );
+			foreach ( array_slice( $found[ $key ], 0, self::MAX_INTEGRITY_FILES_LISTED ) as $file ) {
+				$message .= '  - ' . $file . "\n";
+			}
+			if ( count( $found[ $key ] ) > self::MAX_INTEGRITY_FILES_LISTED ) {
+				$message .= sprintf( "  … y %d más\n", count( $found[ $key ] ) - self::MAX_INTEGRITY_FILES_LISTED );
+			}
+			$message .= "\n";
+		}
+
+		$message .= "Qué hacer:\n";
+		$message .= "- Si acabas de actualizar WordPress a mano o un plugin tocó el núcleo a propósito, puede ser normal.\n";
+		$message .= "- Si NO esperabas el cambio, el sitio puede estar comprometido: restaura los archivos del núcleo desde una copia limpia de WordPress, cambia las contraseñas y revisa los usuarios administradores.\n\n";
+		$message .= admin_url( 'options-general.php?page=essential-hardening' ) . "\n\n";
+		$message .= "--\nNotificación enviada por Essential Hardening & Security.";
+
+		$this->safe_wp_mail( $this->get_alert_recipient(), $subject, $message, array( 'Content-Type: text/plain; charset=UTF-8' ) );
+	}
+
+	public function handle_verify_core_now(): void {
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_die( esc_html__( 'Acceso no autorizado.', 'essential-hardening' ) );
+		}
+
+		check_admin_referer( 'eh_verify_core_nonce' );
+
+		$report = $this->run_core_integrity_check( false );
+
+		wp_safe_redirect(
+			add_query_arg(
+				array(
+					'page'    => 'essential-hardening',
+					'eh_core' => $report['status'],
+				),
+				admin_url( 'options-general.php' )
+			)
+		);
+		exit;
+	}
+
+	/* ======================================================================
 	   PANEL DE CONTROL EN WP-ADMIN (Ajustes > Hardening)
 	   ====================================================================== */
 
@@ -1455,6 +1831,17 @@ final class Essential_Hardening {
 					echo '<p>' . esc_html__( 'Verifica que tu servidor o plugin SMTP tenga configurada correctamente la salida de correo.', 'essential-hardening' ) . '</p>';
 				}
 				echo '</div>';
+			}
+		}
+
+		if ( isset( $_GET['eh_core'] ) ) {
+			$core_status = sanitize_key( wp_unslash( $_GET['eh_core'] ) );
+			if ( 'clean' === $core_status ) {
+				echo '<div class="notice notice-success is-dismissible" style="margin-top: 15px;"><p>' . esc_html__( 'Verificación completada: los archivos del núcleo coinciden con los oficiales.', 'essential-hardening' ) . '</p></div>';
+			} elseif ( 'issues' === $core_status ) {
+				echo '<div class="notice notice-warning is-dismissible" style="margin-top: 15px;"><p><strong>' . esc_html__( 'Se encontraron diferencias en los archivos del núcleo.', 'essential-hardening' ) . '</strong> ' . esc_html__( 'Revisa el detalle en la sección 7.', 'essential-hardening' ) . '</p></div>';
+			} elseif ( 'unavailable' === $core_status ) {
+				echo '<div class="notice notice-error is-dismissible" style="margin-top: 15px;"><p>' . esc_html__( 'No se pudo obtener la lista oficial de sumas de control (api.wordpress.org). Inténtalo de nuevo más tarde.', 'essential-hardening' ) . '</p></div>';
 			}
 		}
 
@@ -2080,6 +2467,99 @@ final class Essential_Hardening {
 							</table>
 						</div>
 					<?php endif; ?>
+				</div>
+
+				<!-- CATEGORÍA 7: Integridad y cambios de administradores -->
+				<div class="eh-card">
+					<div class="eh-card-header">
+						<span class="eh-card-icon">🔍</span>
+						<div>
+							<h2 class="eh-card-title"><?php esc_html_e( '7. Integridad del Sitio y Cambios de Administradores', 'essential-hardening' ); ?></h2>
+							<p class="eh-card-desc"><?php esc_html_e( 'Detecta señales típicas de un sitio comprometido: archivos de WordPress alterados y administradores nuevos.', 'essential-hardening' ); ?></p>
+						</div>
+					</div>
+
+					<div class="eh-grid">
+						<div class="eh-item">
+							<input type="checkbox" id="eh_admin_change_alerts" name="<?php echo esc_attr( self::OPTION_NAME ); ?>[admin_change_alerts]" value="1" <?php checked( $options['admin_change_alerts'] ); ?>>
+							<div class="eh-item-body">
+								<div class="eh-item-title-row">
+									<label for="eh_admin_change_alerts" class="eh-item-label"><?php esc_html_e( 'Alertas de Administradores Nuevos o Promovidos', 'essential-hardening' ); ?></label>
+									<span class="eh-tag eh-tag-access"><?php esc_html_e( 'Notificación', 'essential-hardening' ); ?></span>
+								</div>
+								<p class="eh-item-desc"><?php esc_html_e( 'Envía un correo cuando se crea un usuario Administrador o se le da ese rol a una cuenta existente, indicando quién hizo el cambio y desde qué IP. Crear un administrador oculto es una de las primeras cosas que hace un atacante para volver a entrar.', 'essential-hardening' ); ?></p>
+							</div>
+						</div>
+
+						<div class="eh-item">
+							<input type="checkbox" id="eh_core_integrity_check" name="<?php echo esc_attr( self::OPTION_NAME ); ?>[core_integrity_check]" value="1" <?php checked( $options['core_integrity_check'] ); ?>>
+							<div class="eh-item-body">
+								<div class="eh-item-title-row">
+									<label for="eh_core_integrity_check" class="eh-item-label"><?php esc_html_e( 'Verificar la Integridad del Núcleo de WordPress', 'essential-hardening' ); ?></label>
+									<span class="eh-tag eh-tag-firewall"><?php esc_html_e( 'Diario', 'essential-hardening' ); ?></span>
+								</div>
+								<p class="eh-item-desc"><?php esc_html_e( 'Cada día compara los archivos de WordPress (wp-admin, wp-includes y raíz) con las sumas de control oficiales y avisa por correo si alguno fue modificado, falta o hay archivos PHP ajenos. No revisa wp-content. Descarga la lista oficial desde api.wordpress.org (una petición al día, sin enviar datos de tu sitio salvo la versión y el idioma de WordPress).', 'essential-hardening' ); ?></p>
+
+								<?php
+								$integrity = get_option( 'eh_core_integrity_last', array() );
+								$integrity = is_array( $integrity ) ? $integrity : array();
+								?>
+								<div class="eh-sub-settings" style="align-items: center;">
+									<a href="<?php echo esc_url( wp_nonce_url( admin_url( 'admin-post.php?action=eh_verify_core' ), 'eh_verify_core_nonce' ) ); ?>" class="button button-secondary" style="height: 32px; line-height: 30px; font-size: 12px;">
+										<?php esc_html_e( '🔎 Verificar ahora', 'essential-hardening' ); ?>
+									</a>
+									<span style="font-size: 12px; color: #50575e;">
+										<?php if ( empty( $integrity['time'] ) ) : ?>
+											<?php esc_html_e( 'Aún no se ha ejecutado ninguna verificación.', 'essential-hardening' ); ?>
+										<?php else : ?>
+											<?php
+											printf(
+												/* translators: %s: fecha y hora de la última verificación */
+												esc_html__( 'Última verificación: %s', 'essential-hardening' ),
+												esc_html( date_i18n( 'd/m/Y H:i', (int) $integrity['time'] ) )
+											);
+											?>
+											—
+											<?php if ( 'clean' === ( $integrity['status'] ?? '' ) ) : ?>
+												<strong style="color: #185a25;"><?php esc_html_e( 'sin diferencias', 'essential-hardening' ); ?></strong>
+											<?php elseif ( 'issues' === ( $integrity['status'] ?? '' ) ) : ?>
+												<strong style="color: #b32d2e;"><?php esc_html_e( 'hay diferencias', 'essential-hardening' ); ?></strong>
+											<?php else : ?>
+												<strong><?php esc_html_e( 'no se pudo comprobar', 'essential-hardening' ); ?></strong>
+											<?php endif; ?>
+										<?php endif; ?>
+									</span>
+								</div>
+
+								<?php if ( 'issues' === ( $integrity['status'] ?? '' ) ) : ?>
+									<?php
+									$integrity_labels = array(
+										'modified'   => __( 'Modificados', 'essential-hardening' ),
+										'unexpected' => __( 'PHP ajenos al núcleo', 'essential-hardening' ),
+										'missing'    => __( 'Faltantes', 'essential-hardening' ),
+									);
+									foreach ( $integrity_labels as $integrity_key => $integrity_label ) :
+										$integrity_files = isset( $integrity[ $integrity_key ] ) && is_array( $integrity[ $integrity_key ] ) ? $integrity[ $integrity_key ] : array();
+										if ( empty( $integrity_files ) ) {
+											continue;
+										}
+										?>
+										<p style="margin: 10px 0 2px; font-size: 12px; font-weight: 600;">
+											<?php echo esc_html( $integrity_label . ' (' . count( $integrity_files ) . ')' ); ?>
+										</p>
+										<ul style="margin: 0 0 0 18px; font-size: 12px; font-family: monospace; list-style: disc;">
+											<?php foreach ( array_slice( $integrity_files, 0, self::MAX_INTEGRITY_FILES_LISTED ) as $integrity_file ) : ?>
+												<li><?php echo esc_html( $integrity_file ); ?></li>
+											<?php endforeach; ?>
+											<?php if ( count( $integrity_files ) > self::MAX_INTEGRITY_FILES_LISTED ) : ?>
+												<li><?php echo esc_html( sprintf( '… +%d', count( $integrity_files ) - self::MAX_INTEGRITY_FILES_LISTED ) ); ?></li>
+											<?php endif; ?>
+										</ul>
+									<?php endforeach; ?>
+								<?php endif; ?>
+							</div>
+						</div>
+					</div>
 				</div>
 
 				<!-- Barra Inferior de Guardado -->

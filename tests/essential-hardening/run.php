@@ -298,11 +298,11 @@ try {
 	eh_assert( false === strpos( $h[0], 'Content-Security-Policy: ' ), 'no existe la cabecera CSP que bloquea' );
 
 	add_filter( 'essential_hardening_csp_policy', function () {
-		return "default-src 'self'
+		return "default-src 'self'
 Set-Cookie: x=1";
 	} );
 	$h = $eh->get_transport_headers();
-	eh_assert( 1 === count( $h ) && false === strpbrk( $h[0], "
+	eh_assert( 1 === count( $h ) && false === strpbrk( $h[0], "
 " ), 'saltos de línea en la política no inyectan cabeceras' );
 	remove_all_filters( 'essential_hardening_csp_policy' );
 
@@ -315,12 +315,169 @@ Set-Cookie: x=1";
 	eh_assert( false === $clean['hsts_enabled'] && false === $clean['csp_report_only'], 'al guardar sin marcar, HSTS y CSP quedan apagados' );
 	unset( $_SERVER['HTTPS'] );
 
+	// -----------------------------------------------------------------------
+	eh_section( 'Alertas de administradores nuevos o promovidos' );
+	// -----------------------------------------------------------------------
+	eh_set_options( $eh, array( 'admin_change_alerts' => true, 'security_event_log' => true ) );
+	delete_option( 'eh_security_events_log' );
+
+	$alert_mails = array();
+	add_filter( 'pre_wp_mail', function ( $null, $atts ) use ( &$alert_mails ) {
+		$alert_mails[] = $atts;
+		return true;
+	}, 10, 2 );
+
+	// Usuario nuevo con rol Administrador => alerta (camino real: wp_insert_user dispara user_register)
+	$new_admin_id = wp_insert_user( array(
+		'user_login' => 'eh_test_newadmin_' . $suffix,
+		'user_pass'  => wp_generate_password( 20 ),
+		'user_email' => 'eh-test-newadmin-' . $suffix . '@example.invalid',
+		'role'       => 'administrator',
+	) );
+	eh_assert( 1 === count( $alert_mails ), 'crear un Administrador envía una alerta' );
+	eh_assert( isset( $alert_mails[0]['subject'] ) && false !== strpos( $alert_mails[0]['subject'], 'Cambio de administradores' ), 'el asunto identifica el cambio de administradores' );
+	eh_assert( false !== strpos( (string) ( $alert_mails[0]['message'] ?? '' ), 'eh_test_newadmin_' . $suffix ), 'el correo nombra al usuario afectado' );
+
+	// Usuario nuevo sin privilegios => sin alerta
+	$alert_mails = array();
+	$sub_id      = wp_insert_user( array(
+		'user_login' => 'eh_test_sub_' . $suffix,
+		'user_pass'  => wp_generate_password( 20 ),
+		'user_email' => 'eh-test-sub-' . $suffix . '@example.invalid',
+		'role'       => 'subscriber',
+	) );
+	eh_assert( 0 === count( $alert_mails ), 'crear un suscriptor NO envía alerta' );
+
+	// Promoción de editor a administrador => alerta
+	$alert_mails = array();
+	( new WP_User( $editor_id ) )->set_role( 'administrator' );
+	eh_assert( 1 === count( $alert_mails ), 'promover a una cuenta existente a Administrador envía una alerta' );
+
+	// Volver a asignar el rol dentro de 5 minutos no repite el aviso
+	$alert_mails = array();
+	( new WP_User( $editor_id ) )->add_role( 'administrator' );
+	eh_assert( 0 === count( $alert_mails ), 'el mismo usuario no genera más de un aviso en 5 minutos' );
+
+	// Degradar no avisa
+	$alert_mails = array();
+	( new WP_User( $editor_id ) )->set_role( 'editor' );
+	eh_assert( 0 === count( $alert_mails ), 'quitar el rol de Administrador NO envía alerta' );
+
+	$events = get_option( 'eh_security_events_log', array() );
+	$types  = is_array( $events ) ? wp_list_pluck( $events, 'type' ) : array();
+	eh_assert( in_array( 'Cambio de Admin', $types, true ), 'el cambio queda en el registro de eventos' );
+
+	eh_set_options( $eh, array( 'admin_change_alerts' => false ) );
+	eh_assert( true === $eh->get_default_settings()['admin_change_alerts'], 'las alertas de administradores vienen activas por defecto' );
+	eh_assert( false === $eh->get_default_settings()['core_integrity_check'], 'la verificación del núcleo viene apagada por defecto' );
+
+	remove_all_filters( 'pre_wp_mail' );
+	delete_transient( 'eh_admin_change_' . $new_admin_id );
+	delete_transient( 'eh_admin_change_' . $editor_id );
+	wp_delete_user( $new_admin_id );
+	wp_delete_user( $sub_id );
+
+	// -----------------------------------------------------------------------
+	eh_section( 'Integridad del núcleo de WordPress' );
+	// -----------------------------------------------------------------------
+	$root = sys_get_temp_dir() . '/eh_core_' . $suffix;
+	foreach ( array( '', '/wp-admin', '/wp-includes', '/wp-content/plugins' ) as $d ) {
+		mkdir( $root . $d, 0777, true );
+	}
+	file_put_contents( $root . '/index.php', 'limpio-index' );
+	file_put_contents( $root . '/wp-admin/a.php', 'MODIFICADO' );
+	file_put_contents( $root . '/wp-includes/ok.php', 'limpio-ok' );
+	file_put_contents( $root . '/wp-includes/notes.txt', 'texto ajeno (no ejecutable)' );
+	file_put_contents( $root . '/wp-includes/evil.php', 'webshell' );
+	file_put_contents( $root . '/shell.php', 'webshell' );
+	file_put_contents( $root . '/wp-config.php', 'config propia' );
+	file_put_contents( $root . '/wp-content/plugins/x.php', 'plugin propio' );
+
+	$checksums = array(
+		'index.php'              => md5( 'limpio-index' ),
+		'wp-admin/a.php'         => md5( 'original-a' ),
+		'wp-includes/ok.php'     => md5( 'limpio-ok' ),
+		'wp-includes/missing.php' => md5( 'x' ),
+		'readme.html'            => md5( 'readme' ),
+		'wp-content/plugins/hello.php' => md5( 'hello' ),
+		'wp-includes/version.php' => false,
+	);
+	file_put_contents( $root . '/wp-includes/version.php', 'version propia del idioma' );
+
+	$r = $eh->compare_core_files( $checksums, $root );
+	eh_assert( array( 'wp-admin/a.php' ) === $r['modified'], 'detecta un archivo del núcleo modificado' );
+	eh_assert( array( 'wp-includes/missing.php' ) === $r['missing'], 'detecta un archivo del núcleo que falta' );
+	eh_assert( array( 'shell.php', 'wp-includes/evil.php' ) === $r['unexpected'], 'detecta PHP ajeno en la raíz y en wp-includes' );
+	eh_assert( ! in_array( 'wp-config.php', $r['unexpected'], true ), 'wp-config.php no se marca como inesperado' );
+	eh_assert( ! in_array( 'wp-includes/notes.txt', $r['unexpected'], true ), 'archivos no ejecutables no generan ruido' );
+	eh_assert( ! in_array( 'wp-includes/version.php', array_merge( $r['modified'], $r['unexpected'], $r['missing'] ), true ), 'un archivo marcado como "no comparar" (version.php con idioma sin lista) no genera avisos' );
+	eh_assert( ! in_array( 'readme.html', $r['missing'], true ), 'readme.html ausente no se reporta (lo borran muchos hostings)' );
+	eh_assert( ! in_array( 'wp-content/plugins/hello.php', $r['missing'], true ) && ! in_array( 'wp-content/plugins/x.php', $r['unexpected'], true ), 'wp-content no se revisa' );
+
+	// Ejecución completa: informe, un solo correo por hallazgo y recuperación
+	eh_set_options( $eh, array( 'core_integrity_check' => true ) );
+	add_filter( 'essential_hardening_core_checksums', function () use ( $checksums ) {
+		return $checksums;
+	} );
+	add_filter( 'essential_hardening_core_root', function () use ( $root ) {
+		return $root;
+	} );
+	$core_mails = array();
+	add_filter( 'pre_wp_mail', function ( $null, $atts ) use ( &$core_mails ) {
+		$core_mails[] = $atts;
+		return true;
+	}, 10, 2 );
+	delete_transient( 'eh_last_core_alert_hash' );
+	delete_option( 'eh_core_integrity_last' );
+
+	$report = $eh->run_core_integrity_check();
+	eh_assert( 'issues' === $report['status'], 'la verificación informa "issues" cuando hay diferencias' );
+	eh_assert( 1 === count( $core_mails ) && false === strpos( $core_mails[0]['message'], $root ), 'envía un correo y no revela la ruta absoluta del servidor' );
+	eh_assert( false !== strpos( $core_mails[0]['message'], 'wp-includes/evil.php' ), 'el correo lista los archivos afectados' );
+	eh_assert( is_array( get_option( 'eh_core_integrity_last' ) ), 'guarda el último informe para el panel' );
+
+	$eh->run_core_integrity_check();
+	eh_assert( 1 === count( $core_mails ), 'el mismo hallazgo no repite el correo' );
+
+	$eh->run_core_integrity_check( false );
+	eh_assert( 1 === count( $core_mails ), 'la verificación manual (notify=false) no envía correo' );
+
+	// Se corrige el sitio => limpio y se reinicia la alerta
+	file_put_contents( $root . '/wp-admin/a.php', 'original-a' );
+	file_put_contents( $root . '/wp-includes/missing.php', 'x' );
+	unlink( $root . '/wp-includes/evil.php' );
+	unlink( $root . '/shell.php' );
+	$report = $eh->run_core_integrity_check();
+	eh_assert( 'clean' === $report['status'], 'tras corregir los archivos, el informe es "clean"' );
+	eh_assert( false === get_transient( 'eh_last_core_alert_hash' ), 'al quedar limpio se reinicia el control de correos repetidos' );
+
+	// Lista oficial no disponible (sin internet): no rompe nada ni avisa en falso
+	remove_all_filters( 'essential_hardening_core_checksums' );
+	add_filter( 'essential_hardening_core_checksums', '__return_false' );
+	$before = count( $core_mails );
+	$report = $eh->run_core_integrity_check();
+	eh_assert( 'unavailable' === $report['status'] && count( $core_mails ) === $before, 'sin la lista oficial informa "unavailable" y no envía correo' );
+
+	remove_all_filters( 'essential_hardening_core_checksums' );
+	remove_all_filters( 'essential_hardening_core_root' );
+	remove_all_filters( 'pre_wp_mail' );
+
+	// Limpieza del árbol temporal (solo lo creado arriba)
+	$it = new RecursiveIteratorIterator( new RecursiveDirectoryIterator( $root, FilesystemIterator::SKIP_DOTS ), RecursiveIteratorIterator::CHILD_FIRST );
+	foreach ( $it as $f ) {
+		$f->isDir() ? rmdir( $f->getPathname() ) : unlink( $f->getPathname() );
+	}
+	rmdir( $root );
+
 } finally {
 	// Restaurar el estado del sitio local
 	remove_all_filters( 'pre_wp_mail' );
 	remove_all_filters( 'wp_redirect' );
 	eh_clear_ip_state( $ip );
 	delete_transient( 'eh_2fa_rate_' . $admin_id );
+	delete_option( 'eh_core_integrity_last' );
+	delete_transient( 'eh_last_core_alert_hash' );
+	delete_transient( 'eh_admin_change_' . $editor_id );
 	if ( null === $original_settings ) {
 		delete_option( Essential_Hardening::OPTION_NAME );
 	} else {

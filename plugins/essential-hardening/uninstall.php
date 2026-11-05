@@ -10,7 +10,9 @@ global $wpdb;
 
 delete_option( 'essential_hardening_settings' );
 delete_option( 'eh_security_events_log' );
+delete_option( 'eh_core_integrity_last' );
 wp_clear_scheduled_hook( 'eh_daily_update_check_cron' );
+wp_clear_scheduled_hook( 'eh_daily_core_integrity_cron' );
 
 // Transients de bloqueo, 2FA y control de registro (se guardan con prefijo propio).
 $eh_like_patterns = array(

@@ -2,7 +2,7 @@
 
 Suite modular, ultraligera y sin dependencias externas para el endurecimiento y seguridad perimetral integral de sitios WordPress.
 
-- **Versión:** 1.5.0
+- **Versión:** 1.6.0
 - **Licencia:** GPL-2.0-or-later
 - **Compatibilidad:** WordPress 5.8+ | PHP 7.4 - 8.5
 
@@ -19,7 +19,7 @@ El plugin **Essential Hardening & Security** está diseñado bajo los principios
 
 ---
 
-## 2. Los 19 Módulos de Protección y Auditoría
+## 2. Los 21 Módulos de Protección y Auditoría
 
 ### 2.1. Micro-WAF / Cortafuegos de Peticiones y Query Strings
 Inspecciona tanto la cadena de consulta cruda (`QUERY_STRING`) como la decodificada en cada petición HTTP antes de que los componentes del núcleo o plugins comiencen su procesamiento:
@@ -139,6 +139,24 @@ Visibilidad en tiempo real de los intentos maliciosos bloqueados:
 - Los saltos de línea de la política se eliminan para impedir la inyección de cabeceras.
 - No hay endpoint de informes: las infracciones se ven en la consola del navegador.
 
+### 2.20. Alertas de Administradores Nuevos o Promovidos — desde 1.6.0
+- Opción `admin_change_alerts` (por defecto `true`).
+- Hooks: `user_register` (usuario creado ya con rol `administrator`), `set_user_role` (nuevo rol `administrator` que no estaba en los anteriores) y `add_user_role`.
+- Destinatario: `update_notify_email` o, si está vacío, el correo del administrador del sitio.
+- Anti-ruido: un transient `eh_admin_change_<ID>` de 5 minutos evita avisos repetidos por el mismo usuario (crear un usuario dispara varios hooks).
+- El correo incluye el usuario afectado, quién hizo el cambio (`wp_get_current_user()`, o "ninguno" si fue WP-CLI, cron o una petición sin sesión), la IP y la hora, y se registra como `Cambio de Admin` en el mini-log.
+- Limitación: solo detecta cambios hechos a través de la API de WordPress. Un atacante que escriba directamente en la base de datos no dispara estos hooks.
+
+### 2.21. Verificación de Integridad del Núcleo — opcional, desde 1.6.0
+- Opción `core_integrity_check` (por defecto `false`). Cron diario `eh_daily_core_integrity_cron`, que se desprograma si se apaga la opción o se desactiva el plugin.
+- Fuente: `get_core_checksums()` de WordPress (`api.wordpress.org/core/checksums/1.0/`), con la versión y el idioma instalados. Si el idioma no tiene lista propia (ej. `es_PE`) se usa la de `en_US` y `wp-includes/version.php` se marca como "no comparar" (cambia con el paquete de idioma).
+- `compare_core_files()` devuelve tres listas: `modified` (md5 distinto), `missing` (falta) y `unexpected` (archivos `.php`, `.phtml`, `.phar` o `.php3-8` en la raíz, `wp-admin` o `wp-includes` que no están en la lista oficial). `wp-content` y `wp-config.php` quedan fuera.
+- Se ignoran por defecto `readme.html`, `license.txt`, `wp-config-sample.php` y `wp-admin/install.php` (muchos hostings los eliminan); se ajusta con el filtro `essential_hardening_core_integrity_ignore`.
+- Resultado en la opción `eh_core_integrity_last` (fecha, estado `clean` / `issues` / `unavailable` y listas). El correo se envía una vez por hallazgo distinto (hash en el transient `eh_last_core_alert_hash`, hasta 7 días) y se reinicia al quedar limpio. Si la API no responde, el estado es `unavailable` y **no** se envía correo.
+- El correo no incluye rutas absolutas del servidor, solo rutas relativas a la raíz de WordPress.
+- Antes de verificar se amplía el límite de ejecución a 300 s (`set_time_limit`), porque hay que leer unos 3.500 archivos. En pruebas tardó unos 3 s con los archivos ya en caché del sistema; la primera lectura en frío, en Windows con antivirus, llegó a 137 s. En un hosting normal se espera mucho menos, pero por eso el límite se amplía.
+- Privacidad: la única llamada saliente es la de las sumas de control, una vez al día. No se envían datos del sitio aparte de la versión y el idioma de WordPress.
+
 ## 3. Configuración en Base de Datos
 
 El plugin almacena sus preferencias en una única entrada en `wp_options`:
@@ -169,6 +187,8 @@ El plugin almacena sus preferencias en una única entrada en `wp_options`:
       'hsts_enabled'              => false,
       'hsts_max_age'              => 2592000,
       'csp_report_only'           => false,
+      'admin_change_alerts'       => true,
+      'core_integrity_check'      => false,
   )
   ```
 
@@ -197,6 +217,9 @@ Se usan desde el tema hijo, un `mu-plugin` o un plugin propio. No hace falta edi
 |--------|----------------|
 | `essential_hardening_hsts_include_subdomains` | Devolver `true` para añadir `includeSubDomains` a HSTS (solo si todos los subdominios tienen HTTPS válido). |
 | `essential_hardening_csp_policy` | Reemplazar la política CSP en modo solo-reporte. |
+| `essential_hardening_core_integrity_ignore` | Lista de rutas relativas que la verificación de integridad ignora (por defecto `readme.html`, `license.txt`, `wp-config-sample.php`, `wp-admin/install.php`). |
+| `essential_hardening_core_root` | Directorio raíz de WordPress a verificar, para instalaciones con el núcleo en otra carpeta. |
+| `essential_hardening_core_checksums` | Proveer las sumas de control manualmente (`array`) o simular que no hay (`false`). Pensado para pruebas y entornos sin salida a internet. |
 | `essential_hardening_client_ip` | Resolver la IP real detrás de un proxy o CDN de confianza (ej. Cloudflare). Por defecto solo se usa `REMOTE_ADDR`, porque `X-Forwarded-For` se puede falsificar. |
 | `essential_hardening_failed_login_delay` | Segundos de retardo tras un login fallido (por defecto 2, máximo 5). `0` lo desactiva. |
 | `essential_hardening_waf_patterns` | Añadir o quitar expresiones regulares del Micro-WAF. |
@@ -222,6 +245,7 @@ Notas de comportamiento:
 
 | Versión | Cambios |
 |---------|---------|
+| **1.6.0** | Alertas por correo cuando se crea un Administrador o se promueve una cuenta a ese rol (activadas por defecto). Verificación diaria opcional de la integridad del núcleo de WordPress contra las sumas de control oficiales, con botón "Verificar ahora" y resultado en el panel. Nuevos filtros `essential_hardening_core_integrity_ignore`, `..._core_root` y `..._core_checksums`. 21 escudos en total. `uninstall.php` y la desactivación limpian el cron y el informe nuevos. |
 | **1.5.0** (compatibilidad) | Declarado PHP 7.4 a 8.5. Las pruebas se ejecutaron con PHP 8.3, 8.4 y 8.5 sin avisos; la sintaxis se revisa de 7.4 a 8.5 en la integración continua. |
 | **1.5.0** | HSTS opcional (duración configurable, solo por HTTPS) y Content-Security-Policy en modo solo-reporte. Ambos vienen desactivados. 19 escudos en total. |
 | **1.4.2** | **Seguridad:** corregido un bypass del 2FA por correo (el parámetro `eh_2fa_verified` permitía saltarlo). Reglas de `.htaccess` de uploads compatibles con Apache 2.4 sin `mod_access_compat` (evita error 500) y migración automática del bloque antiguo. Límite de 5 códigos 2FA cada 10 minutos por usuario. Los fallos de 2FA cuentan para el bloqueo de IP. Los intentos durante un bloqueo ya no lo extienden. Honeypot sin retardo. Filtros `essential_hardening_client_ip`, `..._failed_login_delay`, `..._waf_patterns` y `..._waf_skip`. El Micro-WAF registra un evento por IP y minuto. Limpieza al desactivar (cron y `.htaccess`) y `uninstall.php`. `X-XSS-Protection: 0`. Pruebas automáticas en `tests/essential-hardening/`. |
