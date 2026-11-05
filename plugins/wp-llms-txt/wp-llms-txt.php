@@ -3,7 +3,7 @@
  * Plugin Name:       WP LLMs.txt Manager
  * Plugin URI:        https://github.com/luiskaco/utilities_wordpress
  * Description:       Genera, edita y sirve archivos llms.txt y llms-full.txt de forma virtual en la raíz del sitio según la especificación llmstxt.org para optimizar la indexación por modelos de lenguaje (LLMs) y motores de IA.
- * Version:           1.0.2
+ * Version:           1.0.3
  * Requires at least: 5.8
  * Requires PHP:      7.4
  * Author:            WordPress AI Utilities
@@ -22,7 +22,7 @@ final class WP_LLMs_Txt_Manager {
 	/**
 	 * Versión del plugin.
 	 */
-	public const VERSION = '1.0.2';
+	public const VERSION = '1.0.3';
 
 	/**
 	 * Clave de opciones en wp_options.
@@ -71,6 +71,7 @@ final class WP_LLMs_Txt_Manager {
 		add_action( 'init', array( $this, 'register_rewrite_rules' ) );
 		add_filter( 'query_vars', array( $this, 'register_query_vars' ) );
 		add_action( 'template_redirect', array( $this, 'handle_endpoint_request' ) );
+		add_filter( 'redirect_canonical', array( $this, 'prevent_canonical_redirect' ), 10, 2 );
 
 		// Panel de administración
 		if ( is_admin() ) {
@@ -200,6 +201,24 @@ final class WP_LLMs_Txt_Manager {
 	public function register_query_vars( array $vars ): array {
 		$vars[] = 'wp_llms_endpoint';
 		return $vars;
+	}
+
+	/**
+	 * Evitar que WordPress redirija /llms.txt a /llms.txt/ (barra final): el archivo debe responder 200 directo.
+	 *
+	 * @param string|false $redirect_url  URL de redirección propuesta.
+	 * @param string       $requested_url URL solicitada.
+	 * @return string|false
+	 */
+	public function prevent_canonical_redirect( $redirect_url, $requested_url ) {
+		$path = untrailingslashit( (string) wp_parse_url( (string) $requested_url, PHP_URL_PATH ) );
+		$home = untrailingslashit( (string) wp_parse_url( home_url( '/' ), PHP_URL_PATH ) );
+
+		if ( $home . '/llms.txt' === $path || $home . '/llms-full.txt' === $path ) {
+			return false;
+		}
+
+		return $redirect_url;
 	}
 
 	/**
