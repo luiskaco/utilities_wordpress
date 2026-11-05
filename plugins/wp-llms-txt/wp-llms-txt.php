@@ -3,7 +3,7 @@
  * Plugin Name:       WP LLMs.txt Manager
  * Plugin URI:        https://github.com/luiskaco/utilities_wordpress
  * Description:       Genera, edita y sirve archivos llms.txt y llms-full.txt de forma virtual en la raíz del sitio según la especificación llmstxt.org para optimizar la indexación por modelos de lenguaje (LLMs) y motores de IA.
- * Version:           1.0.1
+ * Version:           1.0.2
  * Requires at least: 5.8
  * Requires PHP:      7.4
  * Author:            WordPress AI Utilities
@@ -22,12 +22,17 @@ final class WP_LLMs_Txt_Manager {
 	/**
 	 * Versión del plugin.
 	 */
-	public const VERSION = '1.0.1';
+	public const VERSION = '1.0.2';
 
 	/**
 	 * Clave de opciones en wp_options.
 	 */
 	public const OPTION_KEY = 'wp_llms_txt_options';
+
+	/**
+	 * Clave de wp_options con los hashes de los archivos físicos creados por el plugin.
+	 */
+	public const MANAGED_FILES_KEY = 'wp_llms_txt_managed_files';
 
 	/**
 	 * Instancia Singleton.
@@ -270,6 +275,7 @@ final class WP_LLMs_Txt_Manager {
 		$pages = get_posts( array(
 			'post_type'      => 'page',
 			'post_status'    => 'publish',
+			'has_password'   => false,
 			'posts_per_page' => 15,
 			'orderby'        => 'menu_order title',
 			'order'          => 'ASC',
@@ -295,6 +301,7 @@ final class WP_LLMs_Txt_Manager {
 		$posts = get_posts( array(
 			'post_type'      => 'post',
 			'post_status'    => 'publish',
+			'has_password'   => false,
 			'posts_per_page' => 10,
 			'orderby'        => 'date',
 			'order'          => 'DESC',
@@ -354,12 +361,12 @@ final class WP_LLMs_Txt_Manager {
 
 		// Acción: Generar borrador automático
 		if ( isset( $_POST['wp_llms_txt_generate_draft'] ) ) {
+			// El borrador solo se muestra en el editor; no se guarda hasta pulsar «Guardar Cambios».
 			$this->options['llms_txt'] = $this->build_default_llms_txt();
-			update_option( self::OPTION_KEY, $this->options );
 			add_settings_error(
 				'wp_llms_txt_messages',
 				'draft_generated',
-				__( 'Se generó un borrador automático basado en el contenido público de tu sitio. Recuerda revisar y guardar los cambios.', 'wp-llms-txt' ),
+				__( 'Se generó un borrador en el editor. Todavía no se guardó: revísalo y pulsa «Guardar Cambios» para publicarlo.', 'wp-llms-txt' ),
 				'updated'
 			);
 			return;
@@ -423,29 +430,66 @@ final class WP_LLMs_Txt_Manager {
 			return;
 		}
 
-		$file_llms = $root_path . '/llms.txt';
-		@file_put_contents( $file_llms, $this->options['llms_txt'] ); // phpcs:ignore Generic.PHP.NoSilencedErrors.Discouraged
+		$managed = get_option( self::MANAGED_FILES_KEY, array() );
+		$managed = is_array( $managed ) ? $managed : array();
 
+		$targets = array( 'llms.txt' => $this->options['llms_txt'] );
 		if ( $this->options['enable_full_txt'] && ! empty( $this->options['llms_full_txt'] ) ) {
-			$file_full = $root_path . '/llms-full.txt';
-			@file_put_contents( $file_full, $this->options['llms_full_txt'] ); // phpcs:ignore Generic.PHP.NoSilencedErrors.Discouraged
+			$targets['llms-full.txt'] = $this->options['llms_full_txt'];
+		}
+
+		foreach ( $targets as $name => $body ) {
+			$path = $root_path . '/' . $name;
+			// No pisar un archivo ajeno que ya existía antes de este plugin.
+			if ( file_exists( $path ) && ( empty( $managed[ $name ] ) || md5_file( $path ) !== $managed[ $name ] ) ) {
+				add_settings_error(
+					'wp_llms_txt_messages',
+					'foreign_file_' . $name,
+					sprintf(
+						/* translators: %s: nombre de archivo */
+						__( 'Ya existe un %s en la raíz que no fue creado por este plugin, así que no se sobrescribió.', 'wp-llms-txt' ),
+						$name
+					),
+					'warning'
+				);
+				continue;
+			}
+			if ( false !== file_put_contents( $path, $body ) ) { // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_put_contents
+				$managed[ $name ] = md5_file( $path );
+			}
+		}
+
+		update_option( self::MANAGED_FILES_KEY, $managed, false );
+
+		// Si llms-full se deshabilitó, retirar su copia física (solo si la creó el plugin).
+		if ( ! isset( $targets['llms-full.txt'] ) ) {
+			$this->remove_physical_files( array( 'llms-full.txt' ) );
 		}
 	}
 
 	/**
-	 * Eliminar archivos físicos generados si se desactiva la opción.
+	 * Eliminar archivos físicos creados por este plugin (nunca archivos ajenos).
+	 *
+	 * @param array<string>|null $only Limitar a estos nombres; null = todos los gestionados.
 	 */
-	private function remove_physical_files(): void {
+	private function remove_physical_files( ?array $only = null ): void {
 		$root_path = untrailingslashit( ABSPATH );
-		$file_llms = $root_path . '/llms.txt';
-		$file_full = $root_path . '/llms-full.txt';
+		$managed   = get_option( self::MANAGED_FILES_KEY, array() );
+		$managed   = is_array( $managed ) ? $managed : array();
 
-		if ( file_exists( $file_llms ) && is_writable( $file_llms ) ) {
-			@unlink( $file_llms ); // phpcs:ignore Generic.PHP.NoSilencedErrors.Discouraged
+		foreach ( array_keys( $managed ) as $name ) {
+			if ( null !== $only && ! in_array( $name, $only, true ) ) {
+				continue;
+			}
+			$path = $root_path . '/' . $name;
+			// Solo borrar si sigue siendo exactamente lo que escribió el plugin.
+			if ( file_exists( $path ) && md5_file( $path ) === $managed[ $name ] && is_writable( $path ) ) {
+				unlink( $path );
+			}
+			unset( $managed[ $name ] );
 		}
-		if ( file_exists( $file_full ) && is_writable( $file_full ) ) {
-			@unlink( $file_full ); // phpcs:ignore Generic.PHP.NoSilencedErrors.Discouraged
-		}
+
+		update_option( self::MANAGED_FILES_KEY, $managed, false );
 	}
 
 	/**

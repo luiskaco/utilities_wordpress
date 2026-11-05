@@ -50,6 +50,28 @@ final class Essential_Hardening {
 	private $options = array();
 
 	/**
+	 * Limpieza al desactivar el plugin: cron programado y bloque de .htaccess de uploads.
+	 */
+	public static function on_deactivation(): void {
+		wp_clear_scheduled_hook( 'eh_daily_update_check_cron' );
+
+		$upload_dir = wp_upload_dir();
+		$htaccess   = isset( $upload_dir['basedir'] ) ? trailingslashit( $upload_dir['basedir'] ) . '.htaccess' : '';
+		if ( $htaccess && file_exists( $htaccess ) && is_writable( $htaccess ) ) {
+			$content = (string) file_get_contents( $htaccess );
+			$pattern = '/\R*# BEGIN Essential Hardening Uploads Protection.*?# END Essential Hardening Uploads Protection\R?/s';
+			$cleaned = preg_replace( $pattern, "\n", $content, 1 );
+			if ( null !== $cleaned && $cleaned !== $content ) {
+				if ( '' === trim( $cleaned ) ) {
+					unlink( $htaccess );
+				} else {
+					file_put_contents( $htaccess, ltrim( $cleaned ) );
+				}
+			}
+		}
+	}
+
+	/**
 	 * Obtener instancia singleton.
 	 */
 	public static function get_instance(): self {
@@ -526,6 +548,15 @@ final class Essential_Hardening {
 
 	private function get_client_ip(): string {
 		$ip = isset( $_SERVER['REMOTE_ADDR'] ) ? sanitize_text_field( wp_unslash( $_SERVER['REMOTE_ADDR'] ) ) : '';
+
+		/**
+		 * Permite resolver la IP real detrás de un proxy o CDN de confianza (ej. Cloudflare).
+		 * Por seguridad no se confía en cabeceras X-Forwarded-For por defecto: son falsificables.
+		 *
+		 * @param string $ip IP detectada desde REMOTE_ADDR.
+		 */
+		$ip = (string) apply_filters( 'essential_hardening_client_ip', $ip );
+
 		return filter_var( $ip, FILTER_VALIDATE_IP ) ? $ip : '0.0.0.0';
 	}
 
@@ -1027,6 +1058,15 @@ final class Essential_Hardening {
 			return $user;
 		}
 
+		// Limitar la emisión de códigos por usuario (evita spam de correos y reintentos masivos de adivinación)
+		$rate_key   = 'eh_2fa_rate_' . $user->ID;
+		$rate_count = (int) get_transient( $rate_key );
+		if ( $rate_count >= 5 ) {
+			$this->log_security_event( '2FA Fallido', $this->get_client_ip(), sprintf( __( 'Demasiadas solicitudes de código 2FA (usuario: %s)', 'essential-hardening' ), $user->user_login ) );
+			return new WP_Error( 'eh_2fa_rate_limited', esc_html__( 'Demasiados intentos de acceso. Espera unos minutos antes de volver a intentarlo.', 'essential-hardening' ) );
+		}
+		set_transient( $rate_key, $rate_count + 1, 10 * MINUTE_IN_SECONDS );
+
 		$code     = sprintf( '%06d', wp_rand( 100000, 999999 ) );
 		$token    = wp_generate_password( 32, false, false );
 		$remember = ! empty( $_POST['rememberme'] );
@@ -1115,6 +1155,9 @@ final class Essential_Hardening {
 			if ( $data['attempts'] >= 3 ) {
 				delete_transient( $transient_key );
 				$this->log_security_event( '2FA Fallido', $this->get_client_ip(), sprintf( __( '3 intentos fallidos de 2FA (usuario: %s)', 'essential-hardening' ), $user->user_login ) );
+				if ( ! empty( $this->options['login_throttle'] ) ) {
+					$this->record_failed_login( $user->user_login );
+				}
 				login_header( __( 'Acceso Bloqueado', 'essential-hardening' ), '<p class="message error">' . esc_html__( 'Demasiados intentos fallidos del código de seguridad. Intenta iniciar sesión de nuevo.', 'essential-hardening' ) . '</p>' );
 				login_footer();
 				exit;
@@ -1851,7 +1894,7 @@ final class Essential_Hardening {
 												$type_class = 'eh-tag-firewall';
 												if ( 'Fuerza Bruta' === ( $event['type'] ?? '' ) || '2FA Fallido' === ( $event['type'] ?? '' ) ) {
 													$type_class = 'eh-tag-access';
-												} elseif ( 'Honeypot' === ( $event['type'] ?? '' ) ) {
+												} elseif ( 'Honeypot Anti-Bot' === ( $event['type'] ?? '' ) ) {
 													$type_class = 'eh-tag-spam';
 												} elseif ( 'Anti-Recon' === ( $event['type'] ?? '' ) ) {
 													$type_class = 'eh-tag-privacy';
@@ -1890,3 +1933,6 @@ final class Essential_Hardening {
 
 // Iniciar plugin
 add_action( 'plugins_loaded', array( 'Essential_Hardening', 'get_instance' ) );
+
+// Al desactivar: quitar el cron y las reglas de .htaccess para no dejar residuos
+register_deactivation_hook( ESSENTIAL_HARDENING_FILE, array( 'Essential_Hardening', 'on_deactivation' ) );
