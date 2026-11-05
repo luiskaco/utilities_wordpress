@@ -1,0 +1,54 @@
+name: PHP Compatibility
+
+# Revisa que todos los archivos PHP de los plugins compilen, sin avisos de código obsoleto,
+# desde la versión mínima declarada (7.4) hasta la última estable.
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'plugins/**'
+      - '.github/workflows/php-compat.yml'
+  pull_request:
+    paths:
+      - 'plugins/**'
+      - '.github/workflows/php-compat.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    name: php -l (PHP ${{ matrix.php }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        php: [ '7.4', '8.0', '8.1', '8.2', '8.3', '8.4', '8.5' ]
+    steps:
+      - name: Checkout del repositorio
+        uses: actions/checkout@v4
+
+      - name: Instalar PHP ${{ matrix.php }}
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php }}
+          coverage: none
+          tools: none
+
+      - name: Comprobar sintaxis y avisos de código obsoleto
+        run: |
+          # -n: sin php.ini para no depender de la configuración del runner
+          # error_reporting=-1: los avisos "Deprecated" de compilación también hacen fallar
+          fail=0
+          total=0
+          while IFS= read -r file; do
+            total=$((total + 1))
+            out=$(php -n -d error_reporting=-1 -d display_errors=1 -l "$file" 2>&1) || true
+            case "$out" in
+              "No syntax errors detected"*) ;;
+              *) echo "::error file=${file}::${out}"; fail=1 ;;
+            esac
+          done < <(find plugins -name '*.php')
+          echo "Archivos revisados: ${total}"
+          exit "$fail"

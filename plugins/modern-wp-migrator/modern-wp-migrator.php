@@ -5,7 +5,9 @@
  * Description: Herramienta moderna de migración y respaldos para WordPress. Exporta, importa y restaura sitios completos sin restricciones de tamaño. Totalmente optimizado para PHP 8.x.
  * Author: Modern Dev Team
  * Author URI: https://github.com/luiskaco/utilities_wordpress
- * Version: 7.113.3
+ * Version: 7.113.4
+ * Requires at least: 5.6
+ * Requires PHP: 7.4
  * Text Domain: modern-wp-migrator
  * Domain Path: /languages
  * Network: True

@@ -32,9 +32,19 @@ php tests/essential-hardening/run.php
 - Hace falta activar el plugin en el WordPress local y tener PHP con `mysqli` (el `php.ini` de Laragon lo trae).
 - Si `php` no está en el PATH: `C:\laragon\bin\php\php-8.3.x-Win32-vs16-x64\php.exe`.
 - El script se niega a correr si el host no termina en `.test`, `.local` o `localhost`. Se cambia con `EH_TEST_HOST`.
-- Cubre el 2FA (incluye la regresión del bypass `eh_2fa_verified`), el bloqueo de login, el honeypot y el `.htaccess` de uploads.
+- Cubre el 2FA (incluye la regresión del bypass `eh_2fa_verified`), el bloqueo de login, el honeypot, el `.htaccess` de uploads y las cabeceras HSTS/CSP.
+- `php tests/modern-wp-migrator/export-smoke.php` ejecuta las 17 etapas reales de exportación del migrador y borra la copia que genera. Es la forma de comprobar el plugin con una versión nueva de PHP, porque esas rutas solo se ejecutan al exportar. Hace falta el migrador activo en el WordPress local.
 - Sale con código 1 si alguna prueba falla.
 - Al corregir un bug de seguridad, añade primero la prueba que lo reproduce.
+
+---
+
+### Compatibilidad con versiones de PHP
+
+- Versión mínima declarada: **PHP 7.4**. No uses sintaxis ni funciones de PHP 8.0 o superior (`match`, `str_contains`, `?->`, tipos unión, argumentos con nombre) en el código propio de los plugins.
+- El workflow `.github/workflows/php-compat.yml` revisa la sintaxis y los avisos de código obsoleto de todos los `.php` en PHP 7.4, 8.0, 8.1, 8.2, 8.3, 8.4 y 8.5 en cada push a `main` y en cada pull request.
+- Para probar en local con otra versión: usa el `php.exe` de esa versión en `C:\laragon\bin\php\`, con `-n` (sin `php.ini`) y las extensiones `mysqli`, `mbstring`, `openssl`, `curl` y `zip` cargadas con `-d extension=...`.
+- Al subir el techo de PHP (por ejemplo, cuando salga la 8.6): añade la versión a la matriz del workflow, corre los tests y el `export-smoke.php`, y actualiza los README y las guías.
 
 ---
 

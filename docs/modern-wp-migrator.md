@@ -9,7 +9,7 @@ Herramienta completa, modernizada y sin restricciones para la migración, export
 **Modern WP Migrator** es una bifurcación optimizada para entornos modernos de desarrollo y producción:
 - **Límite de subida de 500 GB:** Desbloquea la restricción artificial tradicional de 512 MB para importar backups `.wpress` de gran envergadura directamente desde el navegador.
 - **Restauración nativa en 1 clic:** Permite restaurar copias de seguridad directamente desde la lista de backups en el panel de WordPress.
-- **Compatibilidad verificada:** Probado exhaustivamente en **PHP 8.0, 8.1, 8.2 y 8.3+** sobre WordPress 6.x.
+- **Compatibilidad verificada:** exportación completa ejecutada con **PHP 8.3 y 8.5** sobre WordPress 7.1 sin avisos ni errores; sintaxis revisada de PHP 7.4 a 8.5 en la integración continua.
 - **Sin telemetría ni publicidad:** Código limpio, sin avisos comerciales, llamadas de seguimiento externas ni botones bloqueados. Desde 7.113.3 se eliminó también el formulario de *feedback* que enviaba el correo y el mensaje del usuario a servmask.com.
 - **Procesamiento por fragmentos (Chunks de 512 KB):** Evita errores de agotamiento de memoria (`memory_limit`) o tiempo de ejecución en servidores compartidos.
 
@@ -25,7 +25,7 @@ Herramienta completa, modernizada y sin restricciones para la migración, export
 | **Búsqueda y reemplazo** | Reemplazo serializado automático de dominios y rutas |
 | **Filtros de exclusión** | Permite omitir spam, revisiones, medios o plugins al exportar |
 | **Restauración directa** | 1 clic desde la lista de respaldos |
-| **Compatibilidad PHP** | PHP 7.4 hasta PHP 8.3+ (0 errores de sintaxis) |
+| **Compatibilidad PHP** | PHP 7.4 hasta PHP 8.5 (0 errores de sintaxis) |
 
 ---
 
@@ -52,6 +52,7 @@ Las correcciones de seguridad del código original **no llegan solas**: hay que 
 
 | Versión | Cambios |
 |---------|---------|
+| **7.113.4** | Soporte declarado para PHP 7.4 a 8.5: añade `Requires PHP` y `Requires at least` a la cabecera. La exportación completa se ejecutó con PHP 8.3 y 8.5 sin avisos. Revisión de sintaxis automática en la integración continua. |
 | **7.113.3** | Se elimina el formulario y el endpoint de *feedback* hacia servmask.com. Evita el error fatal si All-in-One WP Migration está activo. El actualizador deja de depender del namespace interno `v5p7` de PUC. |
 | **7.113.2** | Corrección del actualizador para releases en monorepo. |
 | **7.113.0 – 7.113.1** | Integración en el repositorio central, interfaz modernizada y Plugin Update Checker. |

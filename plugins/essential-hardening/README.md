@@ -126,7 +126,7 @@ Suite ultraligera, modular y sin dependencias para el endurecimiento (*hardening
 
 ## ⚙️ Compatibilidad
 
-- **PHP:** 7.4 o superior (100% compatible con PHP 8.0, 8.1, 8.2 y 8.3).
+- **PHP:** 7.4 o superior, hasta PHP 8.5. Se ejecuta con pruebas en 8.3 y 8.5; la integración continua revisa la sintaxis de 7.4 a 8.5.
 - **WordPress:** 5.8 o superior (probado hasta WordPress 7.1).
 - **Multisite:** Totalmente compatible.
 - **Rendimiento:** 0 consultas pesadas, sin cron jobs innecesarios, sin telemetría ni publicidad.

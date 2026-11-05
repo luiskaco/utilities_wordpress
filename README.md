@@ -9,7 +9,7 @@ Repositorio central de micro-plugins, utilidades y herramientas modulares para W
 | Plugin | Categoría | Versión | Estado | Descripción |
 |---|---|---|---|---|
 | [**Essential Hardening & Security**](./plugins/essential-hardening/) | Seguridad & Hardening | `1.5.0` | `Producción` | Suite de 19 escudos y herramientas: Micro-WAF, fuerza bruta configurable, honeypot anti-bot en login, alertas de login admin, 2FA por correo (opcional), registro en vivo de eventos bloqueados, alertas de actualizaciones pendientes, protección de uploads, desactiva comentarios (403 directo), anti-enumeración, cabeceras HTTP (HSTS y CSP opcionales) y anonimización de huellas. |
-| [**Modern WP Migrator**](./plugins/modern-wp-migrator/) | Migración & Backups | `7.113.3` | `Producción` | Motor de migración sin restricciones: límite de subida desbloqueado a 500 GB, restauración en 1 clic directa, sin telemetría ni publicidad, compatible con PHP 8.3+. |
+| [**Modern WP Migrator**](./plugins/modern-wp-migrator/) | Migración & Backups | `7.113.4` | `Producción` | Motor de migración sin restricciones: límite de subida desbloqueado a 500 GB, restauración en 1 clic directa, sin telemetría ni publicidad, compatible con PHP 8.3+. |
 | [**WP LLMs.txt Manager**](./plugins/wp-llms-txt/) | SEO & Inteligencia Artificial | `1.0.3` | `Producción` | Generador, editor y endpoint virtual para servir archivos estandarizados `/llms.txt` y `/llms-full.txt` optimizados para indexación por LLMs (llmstxt.org). |
 
 ---
@@ -18,7 +18,7 @@ Repositorio central de micro-plugins, utilidades y herramientas modulares para W
 
 - **Zero Bloat:** Ningún plugin incluye librerías innecesarias, trackers ni peticiones a servidores externos.
 - **Portabilidad Total:** Cada plugin en la carpeta `plugins/` es 100% independiente y puede copiarse directamente a cualquier instalación de WordPress.
-- **Rendimiento Nativo:** Construidos sobre la API nativa de WordPress y los estándares de PHP modernos (PHP 7.4 a PHP 8.3+).
+- **Rendimiento Nativo:** Construidos sobre la API nativa de WordPress y los estándares de PHP modernos (PHP 7.4 a PHP 8.5).
 - **Flexibilidad:** Compatibles tanto como plugins tradicionales administrables desde el panel de WordPress o como plugins obligatorios (*Must-Use* en `mu-plugins`).
 
 ---

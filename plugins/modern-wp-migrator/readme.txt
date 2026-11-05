@@ -18,7 +18,7 @@ A modern, fast, and unrestricted site migration and backup tool for WordPress. O
 
 * **Unrestricted Uploads**: Import archives of any size (up to 500 GB) without artificial file limits.
 * **Direct 1-Click Restore**: Restore backups directly from your backup list in the admin panel.
-* **Modern PHP 8.x Compatibility**: Tested and optimized for modern PHP runtimes (PHP 8.0, 8.1, 8.2, 8.3+).
+* **Modern PHP 8.x Compatibility**: Tested and optimized for modern PHP runtimes (PHP 8.0 a 8.5).
 * **Chunked Streaming**: Efficient 512KB chunk processing ensures stability even on memory-constrained servers.
 * **Database & File Integrity**: Preserves serialized data, multisite structures, and media libraries cleanly.
 * **Zero Upsell Nagging**: Clean, distraction-free administration dashboard.

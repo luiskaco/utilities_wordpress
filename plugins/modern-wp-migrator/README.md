@@ -1,9 +1,9 @@
 # Modern WP Migrator
 
 [![WordPress Version](https://img.shields.io/badge/WordPress-5.6%2B%20%7C%206.x-blue?logo=wordpress&logoColor=white)](https://wordpress.org)
-[![PHP Versions](https://img.shields.io/badge/PHP-7.4%20%7C%208.0%20%7C%208.1%20%7C%208.2%20%7C%208.3%2B-777bb4?logo=php&logoColor=white)](https://php.net)
+[![PHP Versions](https://img.shields.io/badge/PHP-7.4%20%7C%208.0%20%7C%208.1%20%7C%208.2%20%7C%208.3%20%7C%208.4%20%7C%208.5-777bb4?logo=php&logoColor=white)](https://php.net)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-green.svg)](https://www.gnu.org/licenses/gpl-3.0)
-[![Release](https://img.shields.io/badge/Release-v7.113.3-blue.svg)](https://github.com/luiskaco/modern-wp-migrator/releases)
+[![Release](https://img.shields.io/badge/Release-v7.113.4-blue.svg)](https://github.com/luiskaco/modern-wp-migrator/releases)
 [![Upload Limit](https://img.shields.io/badge/Upload%20Limit-500%20GB%20(Unlimited)-brightgreen.svg)](#features)
 
 **Modern WP Migrator** is an open-source, unrestricted, and modernized WordPress migration and backup utility engineered for developers, sysadmins, and modern hosting environments.
@@ -20,7 +20,7 @@ Most traditional migration plugins impose artificial limits on free users (such 
 
 - 🔓 **500 GB File Upload Limit**: Upload archives of virtually any size directly from your browser without artificial blocking modals.
 - ⚡ **Direct 1-Click Backup Restoration**: Restore `.wpress` backups directly from your backup list in the WordPress administration panel.
-- 🐘 **Modern PHP 8.x Optimized**: 100% clean syntax and execution on PHP 8.0, 8.1, 8.2, and 8.3+.
+- 🐘 **Modern PHP 8.x Optimized**: 100% clean syntax and execution on PHP 8.0 to 8.5 (exports verified on 8.3 and 8.5).
 - 🧼 **Zero Bloat & Ad-Free**: No upsell notices, no fake grayed-out buttons, no cross-promotions, and no external tracking.
 - 💾 **Safe & Chunked Streaming**: Files are processed in 512 KB chunks to avoid memory exhaustion (`memory_limit`) or script timeouts on budget servers.
 
@@ -34,7 +34,7 @@ Most traditional migration plugins impose artificial limits on free users (such 
 | **Direct 1-Click Restore** | 🔒 Paid extension only | **✅ Enabled out-of-the-box** |
 | **Export Entire Site (.wpress)** | ✅ | **✅** |
 | **Drag & Drop Archive Import** | Restricted by size | **✅ Unrestricted** |
-| **PHP 8.3 Compatibility** | Often raises deprecations | **✅ Fully verified (0 errors)** |
+| **PHP 8.3 / 8.5 Compatibility** | Often raises deprecations | **✅ Fully verified (0 errors)** |
 | **Clean Admin Interface** | Ads, upsells, upsell menus | **✅ Distraction-free** |
 | **System Status Widget** | Telemetry / feedback forms | **✅ Local environment metrics** |
 
@@ -43,7 +43,7 @@ Most traditional migration plugins impose artificial limits on free users (such 
 ## 🛠️ Requirements
 
 - **WordPress**: 5.6 or higher (fully tested on WordPress 6.x)
-- **PHP**: 7.4 to 8.3+
+- **PHP**: 7.4 to 8.5
 - **PHP Extensions**:
   - `curl` (for download operations)
   - `json` (for manifest and chunk index handling)
