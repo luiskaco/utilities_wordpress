@@ -20,7 +20,7 @@ Most traditional migration plugins impose artificial limits on free users (such 
 
 - 🔓 **500 GB File Upload Limit**: Upload archives of virtually any size directly from your browser without artificial blocking modals.
 - ⚡ **Direct 1-Click Backup Restoration**: Restore `.wpress` backups directly from your backup list in the WordPress administration panel.
-- 🐘 **Modern PHP 8.x Optimized**: 100% clean syntax and execution on PHP 8.0 to 8.5 (exports verified on 8.3 and 8.5).
+- 🐘 **Modern PHP 8.x Optimized**: 100% clean syntax and execution on PHP 8.0 to 8.5 (exports verified on 8.3, 8.4 and 8.5).
 - 🧼 **Zero Bloat & Ad-Free**: No upsell notices, no fake grayed-out buttons, no cross-promotions, and no external tracking.
 - 💾 **Safe & Chunked Streaming**: Files are processed in 512 KB chunks to avoid memory exhaustion (`memory_limit`) or script timeouts on budget servers.
 
@@ -34,7 +34,7 @@ Most traditional migration plugins impose artificial limits on free users (such 
 | **Direct 1-Click Restore** | 🔒 Paid extension only | **✅ Enabled out-of-the-box** |
 | **Export Entire Site (.wpress)** | ✅ | **✅** |
 | **Drag & Drop Archive Import** | Restricted by size | **✅ Unrestricted** |
-| **PHP 8.3 / 8.5 Compatibility** | Often raises deprecations | **✅ Fully verified (0 errors)** |
+| **PHP 8.3 / 8.4 / 8.5 Compatibility** | Often raises deprecations | **✅ Fully verified (0 errors)** |
 | **Clean Admin Interface** | Ads, upsells, upsell menus | **✅ Distraction-free** |
 | **System Status Widget** | Telemetry / feedback forms | **✅ Local environment metrics** |
 

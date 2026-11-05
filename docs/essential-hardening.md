@@ -222,7 +222,7 @@ Notas de comportamiento:
 
 | Versión | Cambios |
 |---------|---------|
-| **1.5.0** (compatibilidad) | Declarado PHP 7.4 a 8.5. Las pruebas se ejecutaron con PHP 8.3 y 8.5 sin avisos; la sintaxis se revisa de 7.4 a 8.5 en la integración continua. |
+| **1.5.0** (compatibilidad) | Declarado PHP 7.4 a 8.5. Las pruebas se ejecutaron con PHP 8.3, 8.4 y 8.5 sin avisos; la sintaxis se revisa de 7.4 a 8.5 en la integración continua. |
 | **1.5.0** | HSTS opcional (duración configurable, solo por HTTPS) y Content-Security-Policy en modo solo-reporte. Ambos vienen desactivados. 19 escudos en total. |
 | **1.4.2** | **Seguridad:** corregido un bypass del 2FA por correo (el parámetro `eh_2fa_verified` permitía saltarlo). Reglas de `.htaccess` de uploads compatibles con Apache 2.4 sin `mod_access_compat` (evita error 500) y migración automática del bloque antiguo. Límite de 5 códigos 2FA cada 10 minutos por usuario. Los fallos de 2FA cuentan para el bloqueo de IP. Los intentos durante un bloqueo ya no lo extienden. Honeypot sin retardo. Filtros `essential_hardening_client_ip`, `..._failed_login_delay`, `..._waf_patterns` y `..._waf_skip`. El Micro-WAF registra un evento por IP y minuto. Limpieza al desactivar (cron y `.htaccess`) y `uninstall.php`. `X-XSS-Protection: 0`. Pruebas automáticas en `tests/essential-hardening/`. |
 | **1.4.1** | Captura del error fatal de `wp_mail` cuando `mail()` está deshabilitada en el hosting. |
