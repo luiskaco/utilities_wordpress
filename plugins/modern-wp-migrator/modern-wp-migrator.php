@@ -5,7 +5,7 @@
  * Description: Herramienta moderna de migración y respaldos para WordPress. Exporta, importa y restaura sitios completos sin restricciones de tamaño. Totalmente optimizado para PHP 8.x.
  * Author: Modern Dev Team
  * Author URI: https://github.com/luiskaco/utilities_wordpress
- * Version: 7.113.2
+ * Version: 7.113.3
  * Text Domain: modern-wp-migrator
  * Domain Path: /languages
  * Network: True
@@ -23,6 +23,20 @@
 
 if ( ! defined( 'ABSPATH' ) ) {
 	die( 'Kangaroos cannot jump here' );
+}
+
+// Evitar error fatal si All-in-One WP Migration (el plugin original) ya está cargado:
+// ambos comparten clases y constantes con el prefijo Ai1wm_/AI1WM_.
+if ( defined( 'AI1WM_PLUGIN_BASENAME' ) || class_exists( 'Ai1wm_Main_Controller', false ) ) {
+	add_action(
+		'admin_notices',
+		static function () {
+			echo '<div class="notice notice-error"><p>'
+				. esc_html__( 'Modern WP Migrator no se cargó porque All-in-One WP Migration está activo. Desactiva uno de los dos: no pueden funcionar a la vez.', 'modern-wp-migrator' )
+				. '</p></div>';
+		}
+	);
+	return;
 }
 
 // Check SSL mode

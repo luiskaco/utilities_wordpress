@@ -3,7 +3,7 @@
 [![WordPress Version](https://img.shields.io/badge/WordPress-5.6%2B%20%7C%206.x-blue?logo=wordpress&logoColor=white)](https://wordpress.org)
 [![PHP Versions](https://img.shields.io/badge/PHP-7.4%20%7C%208.0%20%7C%208.1%20%7C%208.2%20%7C%208.3%2B-777bb4?logo=php&logoColor=white)](https://php.net)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-green.svg)](https://www.gnu.org/licenses/gpl-3.0)
-[![Release](https://img.shields.io/badge/Release-v7.113.2-blue.svg)](https://github.com/luiskaco/modern-wp-migrator/releases)
+[![Release](https://img.shields.io/badge/Release-v7.113.3-blue.svg)](https://github.com/luiskaco/modern-wp-migrator/releases)
 [![Upload Limit](https://img.shields.io/badge/Upload%20Limit-500%20GB%20(Unlimited)-brightgreen.svg)](#features)
 
 **Modern WP Migrator** is an open-source, unrestricted, and modernized WordPress migration and backup utility engineered for developers, sysadmins, and modern hosting environments.
