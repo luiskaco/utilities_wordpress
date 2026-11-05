@@ -2,7 +2,7 @@
 
 Suite modular, ultraligera y sin dependencias externas para el endurecimiento y seguridad perimetral integral de sitios WordPress.
 
-- **Versión:** 1.7.0
+- **Versión:** 1.7.1
 - **Licencia:** GPL-2.0-or-later
 - **Compatibilidad:** WordPress 5.8+ | PHP 7.4 - 8.5
 
@@ -270,6 +270,7 @@ Notas de comportamiento:
 
 | Versión | Cambios |
 |---------|---------|
+| **1.7.1** | Reorganización interna sin cambios de comportamiento: la clase única de unas 2.900 líneas se separa en un archivo principal (unas 330 líneas) y 13 módulos en `includes/`. Verificado comparando antes y después los 70 métodos, los 49 hooks que se registran con todo activado y el HTML del panel (idénticos), y con las 97 pruebas en PHP 8.3, 8.4 y 8.5. Nueva prueba que avisa si un módulo no está incorporado a la clase. |
 | **1.7.0** | Protección de cuentas. Recuperación de contraseña limitada a 5 solicitudes por IP y hora y con la misma respuesta exista o no la cuenta (activada por defecto). Opción para desactivar las contraseñas de aplicación, que se saltan el 2FA. Opción de exigir a los administradores contraseñas de al menos 12 caracteres que no estén en filtraciones conocidas (Have I Been Pwned, k-anonimato). La anti-enumeración quita también el mapa del sitio de usuarios. Filtros `..._lostpassword_max_per_hour` y `..._admin_password_min_length`. 24 escudos en total. |
 | **1.6.0** | Alertas por correo cuando se crea un Administrador o se promueve una cuenta a ese rol (activadas por defecto). Verificación diaria opcional de la integridad del núcleo de WordPress contra las sumas de control oficiales, con botón "Verificar ahora" y resultado en el panel. Nuevos filtros `essential_hardening_core_integrity_ignore`, `..._core_root` y `..._core_checksums`. 21 escudos en total. `uninstall.php` y la desactivación limpian el cron y el informe nuevos. |
 | **1.5.0** (compatibilidad) | Declarado PHP 7.4 a 8.5. Las pruebas se ejecutaron con PHP 8.3, 8.4 y 8.5 sin avisos; la sintaxis se revisa de 7.4 a 8.5 en la integración continua. |
@@ -280,3 +281,40 @@ Notas de comportamiento:
 | **1.3.0** | Alertas de actualizaciones pendientes por correo. |
 | **1.2.0** | Honeypot anti-bot en el login y rate limiting configurable. |
 | **1.1.x** | Nuevos escudos (Micro-WAF, protección de uploads, limpieza de `<head>`) y Plugin Update Checker. |
+
+---
+
+## 7. Estructura del código
+
+`Essential_Hardening` sigue siendo **una sola clase** (`final`, patrón singleton). Desde 1.7.1 su código está repartido en *traits* de PHP, uno por módulo, que se incorporan con `use`. Para PHP es exactamente la misma clase: los métodos conservan nombre, visibilidad y firma, y los hooks apuntan a los mismos callbacks.
+
+| Archivo | Contenido |
+|---------|-----------|
+| `essential-hardening.php` | Cabecera del plugin, constantes (`VERSION`, `OPTION_NAME`…), singleton, ajustes por defecto, `init_modules()` (decide qué módulos arrancar) y el arranque. |
+| `includes/trait-support.php` | Utilidades compartidas: IP del cliente, envío seguro de correo, destinatario de alertas y mini-registro de eventos (módulo 17). |
+| `includes/trait-updater.php` | Actualizaciones automáticas desde GitHub (PUC). |
+| `includes/trait-comments.php` | Módulo 1: comentarios y pings. |
+| `includes/trait-privacy.php` | Módulos 2, 4, 5, 11 y 12: anti-enumeración, versión de WordPress, XML-RPC, `<head>` y `body_class`. |
+| `includes/trait-headers.php` | Módulos 3 y 18: cabeceras de seguridad, HSTS y CSP en modo reporte. |
+| `includes/trait-firewall.php` | Módulo 8: Micro-WAF. |
+| `includes/trait-login.php` | Módulos 9 y 13: bloqueo de fuerza bruta y honeypot. |
+| `includes/trait-two-factor.php` | Módulo 16: 2FA por correo. |
+| `includes/trait-accounts.php` | Módulos 20 y 22: recuperación de contraseña y contraseñas robustas. |
+| `includes/trait-uploads.php` | Módulo 10: protección de `uploads`. |
+| `includes/trait-notifications.php` | Módulos 14, 15 y 18: avisos de actualizaciones, de inicio de sesión de administradores y de cambios de administradores. |
+| `includes/trait-integrity.php` | Módulo 19: integridad del núcleo. |
+| `includes/trait-admin.php` | Panel de control: menú, ajustes y pantalla de configuración. |
+
+Detalles que conviene saber:
+
+- Las constantes de clase (`VERSION`, `OPTION_NAME`, `MAX_EVENT_LOG_ENTRIES`, `MAX_INTEGRITY_FILES_LISTED`) permanecen en el archivo principal: PHP 7.4 no permite constantes dentro de un trait.
+- Las rutas a recursos del plugin (como la librería PUC) se calculan con `ESSENTIAL_HARDENING_FILE`, no con `__DIR__`, porque los traits viven en `includes/`.
+- El ZIP de cada release incluye `includes/` porque el workflow empaqueta la carpeta completa del plugin.
+
+### Cómo añadir un módulo nuevo
+
+1. Crea `includes/trait-<nombre>.php` con un `trait Essential_Hardening_<Nombre>` que contenga el método privado `module_<nombre>()` (registra los hooks) y los métodos públicos que esos hooks necesiten.
+2. Añade el `require_once` y el nombre del trait en la lista `use` de `essential-hardening.php`.
+3. Declara la opción en `get_default_settings()` y llama al módulo desde `init_modules()`.
+4. Añade el interruptor en `includes/trait-admin.php` y, si es una opción de tipo número, su validación en `sanitize_settings()`.
+5. Escribe las pruebas en `tests/essential-hardening/run.php` y actualiza esta guía y el README.

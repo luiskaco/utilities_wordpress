@@ -32,6 +32,7 @@ php tests/essential-hardening/run.php
 - Hace falta activar el plugin en el WordPress local y tener PHP con `mysqli` (el `php.ini` de Laragon lo trae).
 - Si `php` no está en el PATH: `C:\laragon\bin\php\php-8.3.x-Win32-vs16-x64\php.exe`.
 - El script se niega a correr si el host no termina en `.test`, `.local` o `localhost`. Se cambia con `EH_TEST_HOST`.
+- Incluye una comprobación de estructura: cada archivo de `plugins/essential-hardening/includes/` debe estar incorporado a la clase.
 - Cubre el 2FA (incluye la regresión del bypass `eh_2fa_verified`), el bloqueo de login, el honeypot, el `.htaccess` de uploads y las cabeceras HSTS/CSP.
 - `php tests/modern-wp-migrator/export-smoke.php` ejecuta las 17 etapas reales de exportación del migrador y borra la copia que genera. Es la forma de comprobar el plugin con una versión nueva de PHP, porque esas rutas solo se ejecutan al exportar. Hace falta el migrador activo en el WordPress local.
 - Sale con código 1 si alguna prueba falla.

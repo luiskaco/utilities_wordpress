@@ -656,6 +656,17 @@ Set-Cookie: x=1";
 	eh_assert( false === wp_is_application_passwords_available(), 'con la opción activa, WordPress deja de ofrecer contraseñas de aplicación' );
 	remove_all_filters( 'wp_is_application_passwords_available' );
 
+	// -----------------------------------------------------------------------
+	eh_section( 'Estructura del código' );
+	// -----------------------------------------------------------------------
+	$trait_files = glob( dirname( __DIR__, 2 ) . '/plugins/essential-hardening/includes/trait-*.php' );
+	$used        = array_keys( class_uses( 'Essential_Hardening' ) );
+	eh_assert( count( $trait_files ) > 0 && count( $trait_files ) === count( $used ), 'cada archivo de includes/ está incorporado a la clase (' . count( $used ) . ' módulos)' );
+	foreach ( $trait_files as $trait_file ) {
+		$expected = 'Essential_Hardening_' . str_replace( ' ', '_', ucwords( str_replace( '-', ' ', substr( basename( $trait_file, '.php' ), 6 ) ) ) );
+		eh_assert( trait_exists( $expected, false ), 'el archivo ' . basename( $trait_file ) . ' define el trait ' . $expected );
+	}
+
 } finally {
 	// Restaurar el estado del sitio local
 	remove_all_filters( 'pre_wp_mail' );

@@ -2,7 +2,7 @@
 
 Suite ultraligera, modular y sin dependencias para el endurecimiento (*hardening*) y protección perimetral de cualquier instalación WordPress. Diseñada para proteger portales institucionales, blogs, tiendas o sitios corporativos con cero sobrecarga técnica y sin tablas adicionales en base de datos.
 
-- **Versión:** 1.7.0
+- **Versión:** 1.7.1
 - **Licencia:** GPL-2.0-or-later
 - **Dependencias:** Cero (PHP nativo + Hooks de WordPress)
 
@@ -158,6 +158,12 @@ Suite ultraligera, modular y sin dependencias para el endurecimiento (*hardening
 - **WordPress:** 5.8 o superior (probado hasta WordPress 7.1).
 - **Multisite:** Totalmente compatible.
 - **Rendimiento:** 0 consultas pesadas, sin cron jobs innecesarios, sin telemetría ni publicidad.
+
+---
+
+## 🧱 Estructura del código
+
+El archivo `essential-hardening.php` contiene solo la cabecera, las constantes, los ajustes y el arranque de los módulos. Cada módulo vive en su propio archivo dentro de `includes/` (por ejemplo `trait-login.php` o `trait-integrity.php`), así que es fácil encontrar y probar cada escudo. Ver el detalle en [docs/essential-hardening.md](../../docs/essential-hardening.md#7-estructura-del-código).
 
 ---
 
