@@ -78,7 +78,7 @@ Dificulta el escaneo automatizado de vulnerabilidades basadas en versión:
 Inyecta cabeceras defensivas estándar en la respuesta HTTP (`send_headers`):
 - `X-Frame-Options: SAMEORIGIN`: Protege contra ataques de clickjacking impidiendo que el sitio sea embebido en iframes de terceros.
 - `X-Content-Type-Options: nosniff`: Fuerza a los navegadores a respetar el tipo MIME declarado, evitando ejecución de código malicioso disfrazado.
-- `X-XSS-Protection: 1; mode=block`: Activa el filtro defensivo XSS en navegadores compatibles.
+- `X-XSS-Protection: 0`: desactiva a propósito el filtro XSS de navegadores antiguos (obsoleto, puede introducir fallos). No se envían CSP ni HSTS: dependen de cada sitio.
 - `Referrer-Policy: strict-origin-when-cross-origin`: Limita el envío de URLs de referencia a dominios externos.
 - `Permissions-Policy: camera=(), microphone=(), geolocation=()`: Desactiva permisos de hardware innecesarios.
 - `X-Pingback`: Remueve la cabecera para mitigar ataques de amplificación.
@@ -95,7 +95,7 @@ Inyecta cabeceras defensivas estándar en la respuesta HTTP (`send_headers`):
 ### 2.13. Honeypot Anti-Bot en Pantalla de Login (Sin Captcha)
 Protección transparente contra bots y atacantes automatizados en `/wp-login.php`:
 - **Campo trampa invisible:** Inyecta un campo camuflado en el formulario de login con estilos ocultos para humanos.
-- **Detección inmediata:** Los bots automatizados que rastrean y autocompletan inputs lo llenan, disparando un bloqueo inmediato con **HTTP 403 Forbidden** y retardo disuasivo de 2 segundos.
+- **Detección inmediata:** Los bots automatizados que rastrean y autocompletan inputs lo llenan, y se les rechaza el login al instante (error de autenticación, sin retardo).
 - **Sin molestias:** Los usuarios humanos no ven el campo ni deben resolver captchas visuales. Cero dependencias y privacidad total.
 
 ### 2.14. Alertas de Actualizaciones Pendientes y Completadas

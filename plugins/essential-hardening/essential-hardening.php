@@ -127,7 +127,7 @@ final class Essential_Hardening {
 		if ( method_exists( $vcs_api, 'enableReleaseAssets' ) ) {
 			$vcs_api->enableReleaseAssets(
 				'/^essential-hardening.*\.zip$/i',
-				\YahnisElsts\PluginUpdateChecker\v5p7\Vcs\Api::REQUIRE_RELEASE_ASSETS
+				$vcs_api::REQUIRE_RELEASE_ASSETS
 			);
 		}
 
@@ -434,7 +434,7 @@ final class Essential_Hardening {
 			if ( ! headers_sent() ) {
 				header( 'X-Frame-Options: SAMEORIGIN' );
 				header( 'X-Content-Type-Options: nosniff' );
-				header( 'X-XSS-Protection: 1; mode=block' );
+				header( 'X-XSS-Protection: 0' ); // El filtro XSS de navegadores antiguos está obsoleto y puede introducir fallos; se desactiva a propósito.
 				header( 'Referrer-Policy: strict-origin-when-cross-origin' );
 				header( 'Permissions-Policy: camera=(), microphone=(), geolocation=()' );
 			}
@@ -1613,7 +1613,7 @@ final class Essential_Hardening {
 									<label for="eh_security_headers" class="eh-item-label"><?php esc_html_e( 'Cabeceras HTTP Defensivas', 'essential-hardening' ); ?></label>
 									<span class="eh-tag eh-tag-firewall"><?php esc_html_e( 'Headers', 'essential-hardening' ); ?></span>
 								</div>
-								<p class="eh-item-desc"><?php esc_html_e( 'Inyecta X-Frame-Options (anti-clickjacking), X-Content-Type-Options: nosniff, Referrer-Policy y Permissions-Policy en cada respuesta HTTP.', 'essential-hardening' ); ?></p>
+								<p class="eh-item-desc"><?php esc_html_e( 'Inyecta X-Frame-Options (anti-clickjacking), X-Content-Type-Options: nosniff, Referrer-Policy y Permissions-Policy en cada respuesta HTTP. No incluye CSP ni HSTS: dependen de cada sitio.', 'essential-hardening' ); ?></p>
 							</div>
 						</div>
 
@@ -1682,7 +1682,7 @@ final class Essential_Hardening {
 									<label for="eh_login_honeypot" class="eh-item-label"><?php esc_html_e( 'Honeypot Anti-Bot en Login', 'essential-hardening' ); ?></label>
 									<span class="eh-tag eh-tag-firewall"><?php esc_html_e( 'Sin Captcha', 'essential-hardening' ); ?></span>
 								</div>
-								<p class="eh-item-desc"><?php esc_html_e( 'Inserta un campo trampa invisible en /wp-login.php. Los humanos no lo ven ni deben resolver acertijos, pero los bots automatizados lo completan y quedan bloqueados al instante con HTTP 403.', 'essential-hardening' ); ?></p>
+								<p class="eh-item-desc"><?php esc_html_e( 'Inserta un campo trampa invisible en /wp-login.php. Los humanos no lo ven ni deben resolver acertijos, pero los bots automatizados lo completan y se les rechaza el login al instante.', 'essential-hardening' ); ?></p>
 							</div>
 						</div>
 
@@ -1843,7 +1843,7 @@ final class Essential_Hardening {
 									<label for="eh_update_notifications" class="eh-item-label"><?php esc_html_e( 'Alertas de Actualizaciones Pendientes y Completadas', 'essential-hardening' ); ?></label>
 									<span class="eh-tag eh-tag-firewall"><?php esc_html_e( 'Monitoreo Activo', 'essential-hardening' ); ?></span>
 								</div>
-								<p class="eh-item-desc"><?php esc_html_e( 'Revisa diariamente el sitio y envía un correo consolidado si hay plugins o temas pendientes de actualizar. También confirma cuando se ejecutan auto-actualizaciones con éxito.', 'essential-hardening' ); ?></p>
+								<p class="eh-item-desc"><?php esc_html_e( 'Revisa diariamente el sitio y envía un correo consolidado si hay plugins o temas pendientes de actualizar. Además, redirige a este mismo correo los avisos de auto-actualización de WordPress y las alertas de acceso de administradores.', 'essential-hardening' ); ?></p>
 
 								<div class="eh-sub-settings" style="align-items: flex-end;">
 									<div class="eh-sub-setting" style="flex: 1; min-width: 260px;">

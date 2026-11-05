@@ -57,7 +57,7 @@ Suite ultraligera, modular y sin dependencias para el endurecimiento (*hardening
 - Inyecta cabeceras defensivas estándar de la industria en cada respuesta HTTP:
   - `X-Frame-Options: SAMEORIGIN` (prevención de clickjacking).
   - `X-Content-Type-Options: nosniff` (previene confusión de tipos MIME).
-  - `X-XSS-Protection: 1; mode=block`.
+  - `X-XSS-Protection: 0` (desactiva el filtro XSS obsoleto de navegadores antiguos).
   - `Referrer-Policy: strict-origin-when-cross-origin`.
   - `Permissions-Policy: camera=(), microphone=(), geolocation=()`.
   - Supresión de la cabecera delatadora `X-Pingback`.
@@ -73,7 +73,7 @@ Suite ultraligera, modular y sin dependencias para el endurecimiento (*hardening
 
 ### 13. Honeypot Anti-Bot en Pantalla de Login (Sin Captcha)
 - Inyecta un campo trampa invisible en el formulario de acceso `/wp-login.php`.
-- Los usuarios humanos no lo ven ni deben resolver acertijos visuales. Los bots automatizados que autocompletan formularios lo llenan y son neutralizados de inmediato con **HTTP 403 Forbidden**.
+- Los usuarios humanos no lo ven ni deben resolver acertijos visuales. Los bots automatizados que autocompletan formularios lo llenan y se les rechaza el login al instante.
 - Cero dependencias: no requiere cuentas de terceros, APIs ni cookies de rastreo externas.
 
 ### 14. Alertas de Actualizaciones Pendientes y Completadas

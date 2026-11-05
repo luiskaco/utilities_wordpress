@@ -77,7 +77,7 @@ if ( file_exists( __DIR__ . '/lib/vendor/plugin-update-checker/plugin-update-che
 		if ( method_exists( $ai1wm_vcs, 'enableReleaseAssets' ) ) {
 			$ai1wm_vcs->enableReleaseAssets(
 				'/^modern-wp-migrator.*\.zip$/i',
-				\YahnisElsts\PluginUpdateChecker\v5p7\Vcs\Api::REQUIRE_RELEASE_ASSETS
+				$ai1wm_vcs::REQUIRE_RELEASE_ASSETS
 			);
 		}
 

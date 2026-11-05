@@ -111,7 +111,7 @@ final class WP_LLMs_Txt_Manager {
 		if ( method_exists( $vcs_api, 'enableReleaseAssets' ) ) {
 			$vcs_api->enableReleaseAssets(
 				'/^wp-llms-txt.*\.zip$/i',
-				\YahnisElsts\PluginUpdateChecker\v5p7\Vcs\Api::REQUIRE_RELEASE_ASSETS
+				$vcs_api::REQUIRE_RELEASE_ASSETS
 			);
 		}
 
@@ -210,12 +210,13 @@ final class WP_LLMs_Txt_Manager {
 
 		// Fallback transparente por URL directa si las reglas de reescritura no se han refrescado
 		if ( empty( $endpoint ) && isset( $_SERVER['REQUEST_URI'] ) ) {
-			$request_path = (string) wp_parse_url( sanitize_text_field( wp_unslash( $_SERVER['REQUEST_URI'] ) ), PHP_URL_PATH );
-			$request_file = basename( untrailingslashit( $request_path ) );
+			$request_path = untrailingslashit( (string) wp_parse_url( sanitize_text_field( wp_unslash( $_SERVER['REQUEST_URI'] ) ), PHP_URL_PATH ) );
+			$home_path    = untrailingslashit( (string) wp_parse_url( home_url( '/' ), PHP_URL_PATH ) );
 
-			if ( 'llms.txt' === $request_file ) {
+			// Solo en la raíz del sitio (soporta WordPress instalado en subcarpeta)
+			if ( $home_path . '/llms.txt' === $request_path ) {
 				$endpoint = 'llms';
-			} elseif ( 'llms-full.txt' === $request_file ) {
+			} elseif ( $home_path . '/llms-full.txt' === $request_path ) {
 				$endpoint = 'llms-full';
 			}
 		}
