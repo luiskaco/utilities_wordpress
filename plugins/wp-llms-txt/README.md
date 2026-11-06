@@ -16,6 +16,7 @@ Diseñado para optimizar la indexación, contexto y comprensión semántica de t
 - **Zero Bloat & Alto Rendimiento:** Un solo archivo PHP, sin dependencias de terceros y con caché HTTP amigable para agentes de IA.
 - **Respuesta directa:** `/llms.txt` y `/llms-full.txt` responden `200` sin redirecciones a una barra final.
 - **No toca archivos ajenos:** si ya existe un `llms.txt` en la raíz que no creó este plugin, no lo sobrescribe ni lo borra.
+- **Importar un archivo existente:** si el hosting ya tiene un `llms.txt` o `llms-full.txt` físico, el panel lo avisa y permite cargar su contenido en el editor con un clic. Después se guarda y se borra el archivo viejo para que el plugin responda esa URL.
 - **Borrador seguro:** el borrador autogenerado solo aparece en el editor; no se guarda hasta pulsar **Guardar Cambios**. No incluye entradas ni páginas protegidas con contraseña.
 
 ---

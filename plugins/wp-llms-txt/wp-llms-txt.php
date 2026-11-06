@@ -3,7 +3,7 @@
  * Plugin Name:       WP LLMs.txt Manager
  * Plugin URI:        https://github.com/luiskaco/utilities_wordpress
  * Description:       Genera, edita y sirve archivos llms.txt y llms-full.txt de forma virtual en la raíz del sitio según la especificación llmstxt.org para optimizar la indexación por modelos de lenguaje (LLMs) y motores de IA.
- * Version:           1.0.3
+ * Version:           1.1.0
  * Requires at least: 5.8
  * Requires PHP:      7.4
  * Author:            WordPress AI Utilities
@@ -22,7 +22,7 @@ final class WP_LLMs_Txt_Manager {
 	/**
 	 * Versión del plugin.
 	 */
-	public const VERSION = '1.0.3';
+	public const VERSION = '1.1.0';
 
 	/**
 	 * Clave de opciones en wp_options.
@@ -33,6 +33,11 @@ final class WP_LLMs_Txt_Manager {
 	 * Clave de wp_options con los hashes de los archivos físicos creados por el plugin.
 	 */
 	public const MANAGED_FILES_KEY = 'wp_llms_txt_managed_files';
+
+	/**
+	 * Tamaño máximo (bytes) de un archivo físico que se puede importar al editor.
+	 */
+	public const MAX_IMPORT_BYTES = 2097152;
 
 	/**
 	 * Instancia Singleton.
@@ -393,6 +398,12 @@ final class WP_LLMs_Txt_Manager {
 		}
 
 		// Acción: Guardar configuración
+		if ( isset( $_POST['wp_llms_txt_import'] ) ) {
+			// Solo carga el contenido en el editor; no guarda ni borra nada.
+			$this->import_foreign_file( sanitize_text_field( wp_unslash( $_POST['wp_llms_txt_import'] ) ) );
+			return;
+		}
+
 		if ( isset( $_POST['wp_llms_txt_submit'] ) ) {
 			$raw_llms      = isset( $_POST['llms_txt'] ) ? wp_unslash( $_POST['llms_txt'] ) : ''; // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized
 			$raw_llms_full = isset( $_POST['llms_full_txt'] ) ? wp_unslash( $_POST['llms_full_txt'] ) : ''; // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized
@@ -432,6 +443,99 @@ final class WP_LLMs_Txt_Manager {
 		$content = str_replace( "\0", '', $content );
 		$content = str_replace( array( "\r\n", "\r" ), "\n", $content );
 		return trim( $content );
+	}
+
+	/**
+	 * Detectar archivos llms.txt / llms-full.txt físicos en la raíz que NO creó este plugin.
+	 *
+	 * Mientras existan, el servidor web los entrega directo y la ruta virtual del plugin no responde.
+	 *
+	 * @return array<string, int> Nombre de archivo => tamaño en bytes.
+	 */
+	private function get_foreign_physical_files(): array {
+		$root_path = untrailingslashit( ABSPATH );
+		$managed   = get_option( self::MANAGED_FILES_KEY, array() );
+		$managed   = is_array( $managed ) ? $managed : array();
+		$found     = array();
+
+		foreach ( array( 'llms.txt', 'llms-full.txt' ) as $name ) {
+			$path = $root_path . '/' . $name;
+			if ( ! is_file( $path ) || ! is_readable( $path ) ) {
+				continue;
+			}
+			// Un archivo cuyo hash coincide con el guardado es del plugin, no ajeno.
+			if ( ! empty( $managed[ $name ] ) && md5_file( $path ) === $managed[ $name ] ) {
+				continue;
+			}
+			$found[ $name ] = (int) filesize( $path );
+		}
+
+		return $found;
+	}
+
+	/**
+	 * Cargar en el editor el contenido de un archivo físico ajeno. No guarda ni borra nada.
+	 *
+	 * @param string $name Debe ser exactamente 'llms.txt' o 'llms-full.txt'.
+	 */
+	private function import_foreign_file( string $name ): void {
+		// Lista cerrada de nombres: nunca se arma una ruta con datos del usuario.
+		$foreign = $this->get_foreign_physical_files();
+		if ( ! isset( $foreign[ $name ] ) ) {
+			add_settings_error(
+				'wp_llms_txt_messages',
+				'import_not_found',
+				__( 'No se encontró ese archivo en la raíz del sitio, o ya fue creado por este plugin.', 'wp-llms-txt' ),
+				'error'
+			);
+			return;
+		}
+
+		if ( $foreign[ $name ] > self::MAX_IMPORT_BYTES ) {
+			add_settings_error(
+				'wp_llms_txt_messages',
+				'import_too_big',
+				sprintf(
+					/* translators: %s: nombre de archivo */
+					__( 'El archivo %s es demasiado grande para importarlo (máximo 2 MB).', 'wp-llms-txt' ),
+					$name
+				),
+				'error'
+			);
+			return;
+		}
+
+		$raw = file_get_contents( untrailingslashit( ABSPATH ) . '/' . $name ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents
+		if ( false === $raw ) {
+			add_settings_error(
+				'wp_llms_txt_messages',
+				'import_unreadable',
+				__( 'No se pudo leer el archivo. Revisa sus permisos.', 'wp-llms-txt' ),
+				'error'
+			);
+			return;
+		}
+
+		// Quitar BOM y bytes que no sean UTF-8 válido antes de mostrarlo en el editor.
+		$raw     = preg_replace( '/^\xEF\xBB\xBF/', '', $raw );
+		$content = $this->sanitize_markdown_text( (string) wp_check_invalid_utf8( (string) $raw, true ) );
+
+		if ( 'llms.txt' === $name ) {
+			$this->options['llms_txt'] = $content;
+		} else {
+			$this->options['llms_full_txt'] = $content;
+		}
+
+		add_settings_error(
+			'wp_llms_txt_messages',
+			'import_done',
+			sprintf(
+				/* translators: %s: nombre de archivo */
+				__( 'Se cargó el contenido de %s en el editor. Todavía no se guardó: revísalo, pulsa «Guardar Cambios» y después borra ese archivo del hosting para que el plugin pase a responder esa URL.', 'wp-llms-txt' ),
+				$name
+			),
+			'updated'
+		);
 	}
 
 	/**
@@ -546,6 +650,38 @@ final class WP_LLMs_Txt_Manager {
 			</p>
 
 			<?php settings_errors( 'wp_llms_txt_messages' ); ?>
+
+			<?php $foreign_files = $this->get_foreign_physical_files(); ?>
+			<?php if ( ! empty( $foreign_files ) ) : ?>
+				<form method="post" action="">
+					<?php wp_nonce_field( 'wp_llms_txt_save_action', 'wp_llms_txt_nonce' ); ?>
+					<div class="notice notice-warning inline" style="padding: 12px 15px; margin-top: 15px;">
+						<p>
+							<strong><?php esc_html_e( 'Hay archivos físicos en la raíz que este plugin no creó.', 'wp-llms-txt' ); ?></strong>
+							<?php esc_html_e( 'Mientras existan, el servidor los entrega directamente y lo que escribas aquí no se verá en esa URL.', 'wp-llms-txt' ); ?>
+						</p>
+						<p>
+							<?php esc_html_e( 'Pasos: 1) importa el contenido al editor, 2) pulsa «Guardar Cambios», 3) borra el archivo del hosting. Importar no borra ni modifica el archivo.', 'wp-llms-txt' ); ?>
+						</p>
+						<p>
+							<?php foreach ( $foreign_files as $foreign_name => $foreign_size ) : ?>
+								<button type="submit" name="wp_llms_txt_import" value="<?php echo esc_attr( $foreign_name ); ?>" class="button button-secondary" onclick="return confirm('<?php echo esc_js( __( 'Esto reemplazará el contenido actual del editor correspondiente. ¿Continuar?', 'wp-llms-txt' ) ); ?>');">
+									<?php
+									echo esc_html(
+										sprintf(
+											/* translators: 1: nombre de archivo, 2: tamaño legible */
+											__( 'Importar %1$s al editor (%2$s)', 'wp-llms-txt' ),
+											$foreign_name,
+											size_format( $foreign_size )
+										)
+									);
+									?>
+								</button>
+							<?php endforeach; ?>
+						</p>
+					</div>
+				</form>
+			<?php endif; ?>
 
 			<div style="display: flex; gap: 20px; margin-top: 20px; flex-wrap: wrap;">
 				<!-- Columna Principal -->

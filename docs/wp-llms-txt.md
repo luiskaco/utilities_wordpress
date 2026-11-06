@@ -12,6 +12,7 @@
 - **Mecanismo de Resiliencia:** Se implementa un detector en fallback analizando `$_SERVER['REQUEST_URI']`. Si el administrador no ha regenerado la estructura de enlaces permanentes (`flush_rewrite_rules`), las peticiones directas a `/llms.txt` o `/llms-full.txt` continúan respondiendo con código HTTP 200 y el MIME `text/plain; charset=utf-8`. Desde 1.0.2 el fallback solo atiende la **raíz del sitio** (respeta WordPress en subcarpeta); una ruta como `/foo/llms.txt` responde 404.
 - **Sin redirección de barra final (desde 1.0.3):** el filtro `redirect_canonical` se desactiva para estas dos URLs. Antes WordPress respondía `301` a `/llms.txt/`; ahora responde `200` directo, como espera el estándar.
 - **Sincronización Física (Opcional):** Permite escribir `llms.txt` y `llms-full.txt` directamente en disco para entornos de alto tráfico donde el servidor web (Nginx / Cloudflare / Apache) atiende archivos estáticos directamente antes de invocar a PHP.
+- **Archivo físico ajeno (desde 1.1.0):** si existe un `llms.txt` o `llms-full.txt` real en la raíz, el servidor web lo entrega antes de que WordPress cargue y la ruta virtual no responde. El panel lo detecta y muestra un botón **Importar … al editor**. Importar solo carga el texto en el editor (sin guardar); luego se pulsa **Guardar Cambios** y se borra el archivo del hosting. El plugin nunca borra archivos que no creó.
 - **Archivos gestionados (desde 1.0.2):** el plugin guarda el hash (`md5`) de cada archivo que escribe en la opción `wp_llms_txt_managed_files`. Solo sobrescribe o borra un archivo si su hash coincide con el que escribió él; si ya existía uno ajeno, no lo toca y avisa en el panel. Si se desactiva `llms-full.txt`, retira su copia física (solo si es suya).
 
 ### 2.2 Estándar de Formato
@@ -63,6 +64,7 @@ El plugin incorpora `Plugin Update Checker (v5.7)` para recibir actualizaciones 
 
 | Versión | Cambios |
 |---------|---------|
+| **1.1.0** | Nuevo: si en la raíz hay un `llms.txt` o `llms-full.txt` que el plugin no creó, el panel lo avisa y ofrece **Importar al editor**. Solo carga el contenido (máx. 2 MB, sin BOM ni bytes no UTF-8); no guarda ni borra el archivo, hay que guardarlo y borrar el archivo a mano. |
 | **1.0.3** | `/llms.txt` y `/llms-full.txt` responden `200` directo, sin `301` a la barra final. |
 | **1.0.2** | El borrador autogenerado ya no se guarda solo. No sobrescribe ni borra archivos `llms.txt` ajenos (hash de archivos gestionados). Excluye entradas con contraseña. El fallback sin permalinks solo atiende la raíz del sitio. Añade `uninstall.php`. El actualizador deja de depender del namespace interno `v5p7` de PUC. |
 | **1.0.1** | Integración de Plugin Update Checker y release por GitHub Actions. |
