@@ -1,6 +1,6 @@
 ---
 trigger: glob
-globs: "*.tsx,*.ts,*.jsx,*.js,*.py,*.php,*.css"
+globs: "*.tsx,*.ts,*.jsx,*.js,*.vue,*.py,*.php,*.css"
 description: Convenciones específicas por lenguaje/framework — aplica automáticamente según la extensión del archivo que se está editando
 ---
 

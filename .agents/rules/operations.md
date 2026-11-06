@@ -9,26 +9,35 @@ description: Activar al configurar CI/CD, logging, manejo de errores externos/ti
 
 ## AI Security
 
+Referencias: OWASP Top 10 for LLM Applications 2026 y Top 10 for Agentic Applications 2026.
+
 ### Prompt Injection
 
-- Nunca interpolar inputs del usuario directamente en system prompts.
-- Sanitizar con allowlist antes de pasar contexto al modelo.
-- Separar instrucciones del sistema de datos del usuario — nunca en el mismo string.
+Ningún filtro la evita del todo: diseñar asumiendo que va a pasar y limitar qué puede hacer el modelo y a dónde llega su salida.
 
-### Aislamiento y Gobernanza
+- Separar instrucciones del sistema y datos del usuario — nunca en el mismo string ni interpolados en el system prompt.
+- Todo contenido externo (páginas, mails, archivos, respuestas de herramientas) es dato, nunca instrucciones.
+
+### Herramientas, Agentes y MCP
+
+- Las mínimas herramientas, con la mínima funcionalidad y los mínimos permisos. Evitar las abiertas, como un shell o un fetch genérico.
+- Ejecutar con los permisos del usuario que pidió la acción, no con una cuenta de servicio amplia.
+- La autorización se decide en código, en cada llamada: el modelo no decide qué está permitido.
+- Confirmación humana antes de acciones destructivas o irreversibles.
+- Servidores MCP solo de fuentes conocidas y con versión fijada: son dependencias con acceso a tus datos.
+
+### Datos y Aislamiento
 
 - Contexto por usuario — nunca compartir contexto entre sesiones de diferentes usuarios.
-- Secretos nunca en el contexto del modelo (API keys, passwords, tokens).
-- Validar y sanitizar todos los outputs del modelo antes de ejecutar o renderizar.
-- Limitar tool calls: definir explícitamente qué herramientas puede invocar el agente.
+- Secretos nunca en el contexto del modelo (API keys, passwords, tokens). Asumir que el system prompt se puede filtrar.
+- RAG: aplicar los permisos del usuario al recuperar documentos, no después.
 - Trazabilidad completa: loggear qué prompt entró, qué salió, qué herramientas se usaron.
-- Límites operacionales: el agente no puede ejecutar operaciones destructivas sin confirmación humana.
 
-### Validación de Outputs
+### Salidas y Consumo
 
+- Tratar la salida del modelo como input no confiable: validar el schema y escapar antes de ejecutar o renderizar.
 - Nunca ejecutar código generado por IA sin revisión en producción.
-- Validar schema de respuestas estructuradas antes de usar el dato.
-- Rate limiting en endpoints que consumen LLMs — son costosos y lentos.
+- Rate limiting, cuotas y límite de costo en endpoints que consumen LLMs.
 
 ---
 
@@ -45,7 +54,9 @@ description: Activar al configurar CI/CD, logging, manejo de errores externos/ti
 ## CI/CD
 
 - **Secrets:** Variables de entorno del sistema CI (GitHub Actions Secrets, etc.) — nunca en el código del workflow.
-- **Escaneo automático:** `npm audit --audit-level=high` / `pip audit` debe pasar antes de deploy.
+- **Escaneo automático:** `npm audit --audit-level=high` / `pip-audit` / `composer audit` debe pasar antes de deploy.
+- **Instalación:** desde el lockfile y sin scripts no autorizados (ver `security.md § Dependencias`).
+- **Acciones de terceros:** fijadas por SHA, no por tag. Permisos mínimos para el token del pipeline.
 - **Dependencias:** Dependabot o Renovate configurado para PRs automáticos de seguridad.
 - **Build seguro:** Nunca loggear variables de entorno en outputs del pipeline.
 - **Branch protection:** `main` protegido — requiere PR + review + CI verde para merge.

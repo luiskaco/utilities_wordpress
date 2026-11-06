@@ -9,7 +9,7 @@ metadata:
 
 ---
 
-## 8. Herramientas Disponibles
+## Herramientas Disponibles
 
 ### Skills de Diseño UI/UX
 
@@ -47,6 +47,47 @@ npx skills add https://github.com/vercel-labs/agent-skills --skill vercel-compos
 
 # impeccable: ver instrucciones en impeccable.style
 ```
+
+---
+
+### Otras skills del kit
+
+Cada proyecto trae solo las de su preset; el resto se agrega a medida.
+
+| Skill | Cuándo activarla |
+|-------|------------------|
+| `security-mitigations` | Al implementar o auditar login, permisos, datos de usuarios, APIs, uploads, dependencias o IA: abre solo el tema que toca |
+| `prelaunch-compliance-audit` | Primer lanzamiento, o al agregar login, pagos, formularios con datos personales o correo promocional |
+| `api-security-best-practices` | Al diseñar o revisar una API |
+| `seo-audit` | Para diagnosticar problemas de SEO en un sitio público |
+| `ai-seo` | Para que el contenido aparezca citado en respuestas de IA, o al armar `llms.txt` |
+| `error-handling-patterns` | Al diseñar el manejo de errores |
+| `fastapi` | En proyectos con FastAPI |
+| `prisma-database-setup` | Al iniciar un proyecto con Prisma o al cambiar su schema |
+| `wordpress-block-theming` | En temas de WordPress basados en bloques |
+| `brainstorming` | Para validar una idea antes de planificarla |
+| `project-planning` | Proyecto nuevo o iniciativa grande: lleva una idea validada a los documentos de `/docs` |
+
+---
+
+### Subagentes
+
+Corren en su propio contexto y cuestan tokens: usarlos para tareas grandes, no para cambios chicos.
+
+| Para qué | Claude Code | Antigravity |
+|----------|-------------|-------------|
+| Planificar tareas grandes | `planner` | — |
+| Revisar un diff | `code-reviewer` | `auditor` |
+| Revisar interfaz | `ui-reviewer` | `frontend` |
+| Auditar seguridad | `security-auditor` | `security` |
+| Revisar migraciones | `db-migration-reviewer` | — |
+| Encontrar la causa de un bug | `debugger` | — |
+| Escribir tests | `test-writer` | — |
+| Implementar en paralelo | — | `backend`, `frontend` |
+| Investigar en internet | `web-researcher` | `web-researcher` |
+| Servidores por SSH (opcionales) | `server-inspector`, `server-operator` | `server-inspector`, `server-operator` |
+
+En Antigravity hay que pedirlos con palabras, no con `@`.
 
 ---
 
@@ -90,5 +131,5 @@ use context7 to resolve tailwindcss — responsive grid v4
 use context7 to resolve react-query — optimistic updates
 ```
 
-> Plan gratuito: 1,000 llamadas/mes. Usar con criterio — solo cuando la documentación
-> es necesaria, no en cada línea de código.
+> El plan gratuito tiene un límite mensual. Usar con criterio — solo cuando la
+> documentación es necesaria, no en cada línea de código.

@@ -1,6 +1,6 @@
 ---
 trigger: model_decision
-description: Activar al escribir o revisar autenticación, endpoints de API, validación de inputs, uploads, manejo de secrets, CORS, cookies de tracking/analytics, consentimiento o compliance de privacidad, o cualquier código que reciba datos del cliente
+description: Activar al escribir o revisar autenticación, endpoints de API, validación de inputs, uploads, manejo de secrets, CORS, cookies de tracking/analytics, consentimiento o compliance de privacidad, instalación o actualización de dependencias, o cualquier código que reciba datos del cliente
 ---
 
 # Security Rules
@@ -10,28 +10,32 @@ description: Activar al escribir o revisar autenticación, endpoints de API, val
 > **Nunca confiar en el frontend.** Todo dato del cliente es potencialmente malicioso.
 > Validar, sanitizar y autorizar en el servidor, siempre.
 
+Este archivo tiene los principios y lo prohibido. El detalle por tema (sesiones, CSP, CSRF, CORS, SSRF, webhooks, IA, WordPress…) está en la skill `security-mitigations`: abrí solo el tema que toque.
+
 ---
 
-## OWASP Top 10 — Mitigación Obligatoria
+## OWASP Top 10:2025 — Mitigación Obligatoria
 
-| Vulnerabilidad | Mitigación |
-|----------------|-----------|
-| Injection | Queries parametrizadas / ORM. Nunca concatenar inputs. |
-| Broken Access Control | RBAC en el servidor, verificar en cada endpoint. |
-| Cryptographic Failures | HTTPS, bcrypt/Argon2id, no MD5/SHA1 para passwords. |
-| Security Misconfiguration | Headers de seguridad, no exponer stack traces. |
-| Vulnerable Dependencies | `npm audit` en CI, mantenedor activo. |
-| SSRF | Allowlist URLs externas, bloquear IPs privadas (10.x, 172.16.x, 192.168.x, 169.254.x). |
-| XSS | Sanitizar outputs, CSP, nunca `innerHTML` con data del usuario. |
-| IDOR | Validar que el usuario tiene acceso al recurso solicitado por ID. |
-| Security Logging | Loggear auth failures, cambios de privilegios, acciones sensibles. |
+| Riesgo | Mitigación |
+|--------|-----------|
+| A01 Broken Access Control | RBAC en el servidor, verificado en cada endpoint. IDOR: validar que el usuario puede acceder a ese recurso. SSRF: allowlist de URLs externas y bloquear IPs privadas (10.x, 172.16.x, 192.168.x, 169.254.x). |
+| A02 Security Misconfiguration | Headers de seguridad, sin stack traces al cliente, sin credenciales ni configuración por defecto. |
+| A03 Software Supply Chain Failures | Ver § Dependencias. |
+| A04 Cryptographic Failures | HTTPS, Argon2id o bcrypt para contraseñas. Nunca MD5 ni SHA1 para contraseñas. |
+| A05 Injection | Queries parametrizadas u ORM, nunca concatenar inputs. XSS: escapar la salida, CSP y nunca `innerHTML` con datos del usuario. |
+| A06 Insecure Design | Antes de codificar login, pagos o datos sensibles, pensar cómo se abusaría y qué límites hacen falta. |
+| A07 Authentication Failures | Ver § Autenticación. |
+| A08 Software or Data Integrity Failures | Verificar firma o integridad de lo que se instala, se actualiza o llega por webhook. No deserializar datos no confiables. |
+| A09 Security Logging and Alerting Failures | Registrar fallos de login, cambios de privilegios y acciones sensibles, y que eso genere una alerta, no solo un log. |
+| A10 Mishandling of Exceptional Conditions | Manejador global de errores. Si algo falla a mitad de camino, negar el acceso y revertir la transacción completa. Límites y cuotas para evitar el agotamiento de recursos. |
 
 ---
 
 ## Autenticación
 
 - **Hashing:** `Argon2id` (preferido) o `bcrypt` con cost factor ≥ 12. Nunca MD5/SHA1.
-- **Passwords:** longitud ≥ 8, verificar contra HaveIBeenPwned API.
+- **Passwords (NIST SP 800-63B rev. 4):** mínimo 15 caracteres si son el único factor; mínimo 8 solo si siempre van con MFA. Permitir al menos 64.
+- **Sin** reglas de composición ni cambio periódico obligatorio. Rechazar contraseñas comunes o comprometidas (HaveIBeenPwned). Permitir pegar y usar gestores de contraseñas.
 - **Access token:** JWT ≤ 15 minutos de expiración.
 - **Refresh token:** Rotación en cada uso — invalidar el anterior al emitir uno nuevo.
 - **Almacenamiento:** Cookies `HttpOnly` + `Secure` + `SameSite=Strict`. Nunca `localStorage`.
@@ -94,11 +98,26 @@ REFRESH_TOKEN_EXPIRES_IN=7d
 
 ---
 
+## File Uploads
+
+- Validar el tipo en el servidor por su contenido (magic bytes), con allowlist. Nunca confiar en la extensión ni en el `Content-Type` declarado.
+- Limitar el tamaño y generar el nombre en el servidor.
+- Guardar fuera del directorio público o en un bucket privado. Lo subido nunca se ejecuta.
+- Servirlo desde otro origen, o con `Content-Disposition: attachment` y `X-Content-Type-Options: nosniff`. SVG y HTML son contenido activo: no servirlos inline.
+
+---
+
 ## Dependencias
 
-- `npm audit --audit-level=high` debe pasar en CI antes de deploy.
-- Lockfiles siempre commiteados.
-- Revisar mantenedor + descargas + último update antes de instalar una nueva.
+`npm audit` solo detecta vulnerabilidades ya conocidas: no frena un paquete recién comprometido.
+
+- **Lockfile** siempre commiteado. En CI, instalar desde él (`npm ci`, `pnpm install --frozen-lockfile`, `composer install`).
+- **Auditoría en CI antes de deploy:** `npm audit --audit-level=high`, `pip-audit` o `composer audit`.
+- **Esperar 7 días antes de instalar una versión recién publicada,** así hay tiempo de detectarla y retirarla: `min-release-age=7` en `.npmrc` (npm 11) o `minimumReleaseAge` en pnpm. Un parche de seguridad urgente se exceptúa a mano.
+- **Scripts de instalación bloqueados:** `ignore-scripts=true` en `.npmrc`. Si un paquete los necesita, se autoriza ese paquete.
+- **Sin dependencias desde git o URLs:** `allow-git=none` en `.npmrc`. Solo registros oficiales.
+- **Antes de instalar una nueva:** confirmar que el nombre existe y es el correcto, sobre todo si lo sugirió una IA. Revisar mantenedor, descargas y último update.
+- **Actualizar con criterio:** Dependabot o Renovate para enterarse, y elegir cada subida de versión. Quitar lo que ya no se usa.
 
 ---
 

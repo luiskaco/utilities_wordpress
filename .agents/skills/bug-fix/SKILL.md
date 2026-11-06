@@ -37,7 +37,7 @@ que reproduce el bug. Pasarle el síntoma y cómo reproducirlo.
 
 ### 3. Actualizar 06_TASKS.md (obligatorio)
 
-Agregar en `## In Progress`:
+Agregar en `## En progreso`:
 
 ```
 - [ ] fix: [descripción del bug] — causa: [causa raíz identificada]

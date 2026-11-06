@@ -40,6 +40,7 @@ lo que no se pudo comprobar va como "a verificar", no como aprobado.
 ### Seguridad
 
 - [ ] `npm audit --audit-level=high` sin vulnerabilidades críticas (o `pip-audit` / `composer audit`)
+- [ ] Dependencias instaladas desde el lockfile y sin scripts no autorizados (ver `security.md § Dependencias`)
 - [ ] Variables de entorno: las que lee el código (`process.env.X`, `import.meta.env.X`, `os.environ`) están todas en `.env.example`. Una nueva sin documentar bloquea: el deploy arranca sin ella
 - [ ] `.env*` fuera del repo y en `.gitignore`
 - [ ] Headers de seguridad configurados

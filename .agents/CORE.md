@@ -68,7 +68,7 @@ Largo proporcional al cambio: un fix chico cierra en 2 líneas. Sin narrar el pr
 | CMS | WordPress |
 | Base de datos | PostgreSQL / MySQL / MongoDB / Supabase |
 | Estilos | Tailwind CSS / CSS puro |
-| Runtime | Node.js 20+ / Python 3.11+ |
+| Runtime | Node.js 24+ / Python 3.12+ |
 
 **📌 Versiones actualizadas — regla obligatoria:**
 

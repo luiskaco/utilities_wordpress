@@ -17,7 +17,7 @@ commandExecutionPolicy: sandbox
 
 Auditoría de solo lectura — nunca corregís código, solo reportás. No tenés tools de escritura: `run_command` es para inspección (`git diff`, `git log`, `npm audit`, `pip-audit`) y nada más.
 
-Leé `.agents/rules/security.md` antes de empezar; si el proyecto integra un LLM con tool calls, sumá `.agents/rules/operations.md` (§ AI Security).
+Leé `.agents/rules/security.md` antes de empezar; si el proyecto integra un LLM con tool calls, sumá `.agents/rules/operations.md` (§ AI Security). Después abrí el índice `.agents/skills/security-mitigations/SKILL.md` y solo los temas que toque lo que auditás.
 
 ## Checklist
 
@@ -29,8 +29,8 @@ Leé `.agents/rules/security.md` antes de empezar; si el proyecto integra un LLM
 - **Uploads** — tipo de archivo validado server-side, tamaño limitado, sin ejecución del contenido subido.
 - **CORS y cookies** — orígenes explícitos, nunca wildcard con credenciales; `HttpOnly`, `Secure` y `SameSite` donde corresponda.
 - **Privacidad** — cookies de tracking y analytics con consentimiento previo, datos personales mínimos y con base legal.
-- **Dependencias** — paquetes con CVEs conocidos si hay forma de chequearlo desde el lockfile.
-- **Prompt injection** — si el proyecto pasa input de usuario a un modelo: instrucciones separadas de datos, sin interpolar input crudo en el system prompt.
+- **Dependencias** — paquetes con CVEs conocidos si hay forma de chequearlo desde el lockfile; instaladas desde git o con scripts `postinstall` sospechosos; configuración contra § Dependencias de la regla.
+- **Prompt injection** — si el proyecto pasa input de usuario a un modelo: instrucciones separadas de datos, contenido externo tratado como dato, tools y servidores MCP con permisos mínimos y autorización decidida por código.
 
 ## Formato de reporte
 

@@ -27,7 +27,7 @@ description: Activar al construir o revisar interfaces, componentes visuales, fo
 
 ---
 
-## Accesibilidad (WCAG 2.1 AA)
+## Accesibilidad (WCAG 2.2 AA)
 
 - Contraste texto/fondo: **4.5:1** normal, **3:1** texto grande.
 - Todos los inputs con `<label>` o `aria-label`.
@@ -39,6 +39,12 @@ description: Activar al construir o revisar interfaces, componentes visuales, fo
 - Nunca `outline: none` sin reemplazo — usar `focus-visible:ring-*`.
 - Usar `:focus-visible` sobre `:focus`.
 - `prefers-reduced-motion` respetado en todas las animaciones.
+- Áreas clicables de al menos 24×24 px CSS, o con espacio suficiente alrededor.
+- El foco de teclado nunca queda tapado por barras fijas ni banners.
+- Toda acción de arrastre tiene una alternativa sin arrastrar.
+- La ayuda y el contacto aparecen en el mismo lugar en todas las páginas.
+- No pedir de nuevo un dato ya ingresado en el mismo flujo.
+- Login sin pruebas de memoria: permitir pegar y gestores de contraseñas.
 
 ---
 
