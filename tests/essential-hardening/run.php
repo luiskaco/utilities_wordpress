@@ -667,7 +667,130 @@ Set-Cookie: x=1";
 		eh_assert( trait_exists( $expected, false ), 'el archivo ' . basename( $trait_file ) . ' define el trait ' . $expected );
 	}
 
+	// -----------------------------------------------------------------------
+	eh_section( 'Bloqueo de IP por escaneo de autores' );
+	// -----------------------------------------------------------------------
+	eh_set_options( $eh, array( 'security_event_log' => true, 'recon_ip_ban' => true ) );
+	wp_set_current_user( 0 );
+	delete_option( 'eh_security_events_log' );
+
+	$recon_ref  = new ReflectionClass( $eh );
+	$scan       = $recon_ref->getMethod( 'register_author_scan' );
+	$bannable   = $recon_ref->getMethod( 'is_ip_bannable' );
+	$scan->setAccessible( true );
+	$bannable->setAccessible( true );
+
+	$scanner_ip = '201.223.127.28';
+	$count_key  = 'eh_recon_count_' . md5( $scanner_ip );
+	$ban_key    = 'eh_recon_ban_' . md5( $scanner_ip );
+	delete_transient( $count_key );
+	delete_transient( $ban_key );
+
+	eh_assert( true === $bannable->invoke( $eh, $scanner_ip ), 'una IP publica se puede banear' );
+	eh_assert( false === $bannable->invoke( $eh, '127.0.0.1' ), 'localhost nunca se banea' );
+	eh_assert( false === $bannable->invoke( $eh, '192.168.1.10' ), 'una IP de red local nunca se banea' );
+	eh_assert( false === $bannable->invoke( $eh, '0.0.0.0' ), 'IP desconocida (0.0.0.0) nunca se banea' );
+
+	for ( $i = 1; $i <= 4; $i++ ) {
+		$scan->invoke( $eh, $scanner_ip );
+	}
+	eh_assert( false === get_transient( $ban_key ), '4 escaneos todavia no bloquean' );
+	eh_assert( 4 === (int) get_transient( $count_key ), 'se cuentan los escaneos' );
+
+	$scan->invoke( $eh, $scanner_ip );
+	eh_assert( false !== get_transient( $ban_key ), 'el 5.o escaneo bloquea la IP' );
+	eh_assert( false === get_transient( $count_key ), 'el contador se reinicia al bloquear' );
+	$events = get_option( 'eh_security_events_log', array() );
+	eh_assert( ! empty( $events ) && false !== strpos( $events[0]['detail'], 'IP bloqueada' ), 'el bloqueo queda en el registro de eventos' );
+
+	// IP privada y usuario con sesion: no cuentan
+	$scan->invoke( $eh, '127.0.0.1' );
+	eh_assert( false === get_transient( 'eh_recon_count_' . md5( '127.0.0.1' ) ), 'una IP local no acumula escaneos' );
+	delete_transient( $ban_key );
+	wp_set_current_user( $admin_id );
+	for ( $i = 1; $i <= 6; $i++ ) {
+		$scan->invoke( $eh, $scanner_ip );
+	}
+	eh_assert( false === get_transient( $ban_key ) && false === get_transient( $count_key ), 'un usuario con sesion no cuenta ni se banea' );
+	wp_set_current_user( 0 );
+
+		// Con la casilla apagada (valor por defecto) no se cuenta ni se bloquea
+	eh_assert( false === $eh->get_default_settings()['recon_ip_ban'], 'el bloqueo de IP viene desactivado por defecto' );
+	eh_set_options( $eh, array( 'security_event_log' => true ) );
+	for ( $i = 1; $i <= 6; $i++ ) {
+		$scan->invoke( $eh, $scanner_ip );
+	}
+	eh_assert( false === get_transient( $ban_key ) && false === get_transient( $count_key ), 'con la opcion apagada no se cuenta ni se bloquea' );
+	eh_set_options( $eh, array( 'security_event_log' => true, 'recon_ip_ban' => true ) );
+
+	// Umbral 0 = desactivado
+	add_filter( 'essential_hardening_recon_ban_threshold', '__return_zero' );
+	for ( $i = 1; $i <= 6; $i++ ) {
+		$scan->invoke( $eh, $scanner_ip );
+	}
+	eh_assert( false === get_transient( $ban_key ), 'umbral 0 desactiva el bloqueo' );
+		remove_all_filters( 'essential_hardening_recon_ban_threshold' );
+
+	// -----------------------------------------------------------------------
+	eh_section( 'País y bandera de las IP' );
+	// -----------------------------------------------------------------------
+	$geo       = $recon_ref->getMethod( 'get_ip_countries' );
+	$label     = $recon_ref->getMethod( 'render_country_label' );
+	$geo->setAccessible( true );
+	$label->setAccessible( true );
+	$geo_calls = 0;
+	add_filter( 'essential_hardening_ip_country', function ( $country, $ip ) use ( &$geo_calls ) {
+		$geo_calls++;
+		return '201.223.127.28' === $ip ? array( 'code' => 'EC', 'name' => 'Ecuador' ) : array( 'code' => 'zz<', 'name' => 'x' );
+	}, 10, 2 );
+
+	eh_assert( false === $eh->get_default_settings()['show_ip_country'], 'el pais de las IP viene desactivado por defecto' );
+	eh_set_options( $eh, array() );
+	eh_assert( array() === $geo->invoke( $eh, array( '201.223.127.28' ) ) && 0 === $geo_calls, 'apagado: no resuelve ni consulta nada' );
+
+	eh_set_options( $eh, array( 'show_ip_country' => true ) );
+	$res = $geo->invoke( $eh, array( '201.223.127.28', '201.223.127.28', '127.0.0.1', '192.168.0.4', '8.8.8.8' ) );
+	eh_assert( isset( $res['201.223.127.28'] ) && 'EC' === $res['201.223.127.28']['code'], 'resuelve el pais de una IP publica' );
+	eh_assert( ! isset( $res['127.0.0.1'] ) && ! isset( $res['192.168.0.4'] ), 'las IP locales o privadas no se consultan' );
+	eh_assert( ! isset( $res['8.8.8.8'] ), 'un codigo de pais invalido se descarta' );
+	eh_assert( 2 === $geo_calls, 'una IP repetida se resuelve una sola vez' );
+
+	$html = $label->invoke( $eh, array( 'code' => 'EC', 'name' => 'Ecuador<script>' ) );
+	eh_assert( false !== strpos( $html, 'flagcdn.com/w20/ec.png' ) && false === strpos( $html, '<script>' ), 'la bandera usa flagcdn y escapa el nombre' );
+	remove_all_filters( 'essential_hardening_ip_country' );
+
+	// El panel muestra el Top 5 y la columna Pais solo si esta activado
+	update_option( 'eh_security_events_log', array(
+		array( 'timestamp' => time(), 'type' => 'Anti-Recon', 'ip' => '201.223.127.28', 'detail' => 'a' ),
+		array( 'timestamp' => time(), 'type' => 'Anti-Recon', 'ip' => '201.223.127.28', 'detail' => 'b' ),
+		array( 'timestamp' => time(), 'type' => 'Micro-WAF', 'ip' => '8.8.8.8', 'detail' => 'c' ),
+	), false );
+	add_filter( 'essential_hardening_ip_country', function () {
+		return array( 'code' => 'EC', 'name' => 'Ecuador' );
+	} );
+	require_once ABSPATH . 'wp-admin/includes/admin.php';
+	wp_set_current_user( $admin_id );
+	foreach ( array( false, true ) as $on ) {
+		// El panel lee los ajustes guardados en la base de datos; el original se restaura al final.
+		update_option( Essential_Hardening::OPTION_NAME, array_merge( $eh->get_default_settings(), array( 'show_ip_country' => $on ) ) );
+		eh_set_options( $eh, array( 'show_ip_country' => $on ) );
+		ob_start();
+		$eh->render_admin_page();
+		$panel = ob_get_clean();
+		if ( $on ) {
+			eh_assert( false !== strpos( $panel, 'Top 5 de IP bloqueadas' ) && false !== strpos( $panel, 'flagcdn.com/w20/ec.png' ), 'activado: el panel muestra el Top 5 y las banderas' );
+		} else {
+			eh_assert( false === strpos( $panel, 'Top 5 de IP bloqueadas' ) && false === strpos( $panel, 'flagcdn.com/w20/' ), 'apagado: el panel no muestra Top 5 ni banderas' );
+		}
+	}
+	wp_set_current_user( 0 );
+	remove_all_filters( 'essential_hardening_ip_country' );
+	delete_transient( 'eh_geo_' . md5( '201.223.127.28' ) );
+
 } finally {
+	delete_transient( 'eh_recon_count_' . md5( '201.223.127.28' ) );
+		delete_transient( 'eh_recon_ban_' . md5( '201.223.127.28' ) );
+	remove_all_filters( 'essential_hardening_ip_country' );
 	// Restaurar el estado del sitio local
 	remove_all_filters( 'pre_wp_mail' );
 	remove_all_filters( 'wp_redirect' );

@@ -2,7 +2,7 @@
 
 Suite modular, ultraligera y sin dependencias externas para el endurecimiento y seguridad perimetral integral de sitios WordPress.
 
-- **Versión:** 1.7.1
+- **Versión:** 1.8.0
 - **Licencia:** GPL-2.0-or-later
 - **Compatibilidad:** WordPress 5.8+ | PHP 7.4 - 8.5
 
@@ -174,8 +174,19 @@ Visibilidad en tiempo real de los intentos maliciosos bloqueados:
 - Fallo abierto: si la API no responde o devuelve un error, la contraseña se acepta. No se bloquea a nadie por una caída externa.
 - El error se registra con el código `eh_weak_password`.
 
-### Cambio en 2.4 (anti-enumeración)
+### Cambio en 2.4 (anti-enumeración): bloqueo de IP, opcional, desde 1.8.0
+Opción `recon_ip_ban` (por defecto `false`; sin ella no se cuenta ni se bloquea nada). Cada `?author=` sin sesión iniciada suma un escaneo para la IP (transient `eh_recon_count_<md5(ip)>`, ventana de 10 min). Al llegar a 5 (filtro `essential_hardening_recon_ban_threshold`; `0` lo desactiva) se crea el transient `eh_recon_ban_<md5(ip)>` durante 1 hora (filtro `essential_hardening_recon_ban_duration`, mínimo 1 min) y se anota un evento `Anti-Recon`. Mientras dure, un hook en `init` (prioridad 0) responde `403` con `Retry-After` a esa IP en todo el sitio. No cuentan ni se bloquean los usuarios con sesión, `0.0.0.0` ni las IP privadas o reservadas (`FILTER_FLAG_NO_PRIV_RANGE | NO_RES_RANGE`). Detrás de un proxy o CDN hay que resolver la IP real con `essential_hardening_client_ip`; si no, todos los visitantes comparten la IP del proxy. El panel lo avisa: junto a la casilla muestra siempre la advertencia del proxy, y un aviso activo si la petición del panel trae `HTTP_CF_CONNECTING_IP`, `HTTP_X_FORWARDED_FOR` o `HTTP_X_REAL_IP` y la IP detectada sigue siendo `REMOTE_ADDR`.
+
+### Cambio en 2.4 (anti-enumeración): mapa del sitio, desde 1.7.0
 Desde 1.7.0 también se elimina el proveedor `users` del mapa del sitio de WordPress (`wp_sitemaps_add_provider`), que exponía la lista de autores en `/wp-sitemap-users-1.xml`.
+
+### 2.25. País y bandera de las IP del registro — opcional, desde 1.8.0
+- Opción `show_ip_country` (por defecto `false`). Con ella apagada el panel no hace ninguna consulta externa.
+- Encendida, el registro de eventos gana una columna *País* y, encima, la tabla **Top 5 de IP bloqueadas** (las 5 IP con más eventos entre los 25 guardados).
+- País: `GET https://ipwho.is/<ip>?fields=success,country,country_code` (HTTPS, sin clave, 3 s de espera). El resultado se guarda 30 días por IP en el transient `eh_geo_<md5(ip)>`; un fallo se recuerda 1 hora. Como mucho 6 consultas nuevas por carga del panel: las IP que falten se completan al recargar.
+- No se consultan IP locales, privadas ni reservadas. Solo salen las IP de los eventos (atacantes), nunca las de visitantes normales. El código de país se valida (`^[A-Z]{2}$`).
+- Banderas: `<img>` de `https://flagcdn.com/w20/<codigo>.png` (y `w40` para pantallas de alta densidad), con `referrerpolicy="no-referrer"`. Se usan imágenes y no emojis porque Windows no dibuja los emojis de bandera.
+- Filtro `essential_hardening_ip_country`: devuelve `array( 'code' => 'EC', 'name' => 'Ecuador' )` para resolver el país con tu propia base GeoIP o con la cabecera de una CDN, sin consulta externa.
 
 ## 3. Configuración en Base de Datos
 
@@ -243,6 +254,9 @@ Se usan desde el tema hijo, un `mu-plugin` o un plugin propio. No hace falta edi
 | `essential_hardening_core_integrity_ignore` | Lista de rutas relativas que la verificación de integridad ignora (por defecto `readme.html`, `license.txt`, `wp-config-sample.php`, `wp-admin/install.php`). |
 | `essential_hardening_core_root` | Directorio raíz de WordPress a verificar, para instalaciones con el núcleo en otra carpeta. |
 | `essential_hardening_core_checksums` | Proveer las sumas de control manualmente (`array`) o simular que no hay (`false`). Pensado para pruebas y entornos sin salida a internet. |
+| `essential_hardening_recon_ban_threshold` | Escaneos de autor en 10 minutos que bloquean la IP (por defecto 5; `0` desactiva el bloqueo). |
+| `essential_hardening_recon_ban_duration` | Segundos que dura el bloqueo de la IP (por defecto 3600). |
+| `essential_hardening_ip_country` | Resolver el país de una IP sin consulta externa (`array( 'code', 'name' )`). |
 | `essential_hardening_lostpassword_max_per_hour` | Máximo de solicitudes de recuperación de contraseña por IP y hora (por defecto 5). |
 | `essential_hardening_admin_password_min_length` | Longitud mínima de la contraseña de un administrador (por defecto 12, mínimo 8). |
 | `essential_hardening_client_ip` | Resolver la IP real detrás de un proxy o CDN de confianza (ej. Cloudflare). Por defecto solo se usa `REMOTE_ADDR`, porque `X-Forwarded-For` se puede falsificar. |
@@ -270,6 +284,7 @@ Notas de comportamiento:
 
 | Versión | Cambios |
 |---------|---------|
+| **1.8.0** | Dos opciones nuevas, **ambas desactivadas por defecto**. (1) Bloqueo temporal de la IP que hace 5 escaneos `?author=` en 10 minutos: 403 en todo el sitio durante 1 hora, con un evento en el registro; no afecta a usuarios con sesión ni a IP privadas; el panel avisa si detecta un proxy o CDN sin la IP real configurada. (2) País y bandera de cada IP en el registro de eventos, con tabla Top 5 de IP bloqueadas (consulta a `ipwho.is`, banderas de `flagcdn.com`). Filtros `essential_hardening_recon_ban_threshold`, `..._recon_ban_duration` e `..._ip_country`. 21 pruebas nuevas (134 en total). |
 | **1.7.1** | Reorganización interna sin cambios de comportamiento: la clase única de unas 2.900 líneas se separa en un archivo principal (unas 330 líneas) y 13 módulos en `includes/`. Verificado comparando antes y después los 70 métodos, los 49 hooks que se registran con todo activado y el HTML del panel (idénticos), y con las 97 pruebas en PHP 8.3, 8.4 y 8.5. Nueva prueba que avisa si un módulo no está incorporado a la clase. |
 | **1.7.0** | Protección de cuentas. Recuperación de contraseña limitada a 5 solicitudes por IP y hora y con la misma respuesta exista o no la cuenta (activada por defecto). Opción para desactivar las contraseñas de aplicación, que se saltan el 2FA. Opción de exigir a los administradores contraseñas de al menos 12 caracteres que no estén en filtraciones conocidas (Have I Been Pwned, k-anonimato). La anti-enumeración quita también el mapa del sitio de usuarios. Filtros `..._lostpassword_max_per_hour` y `..._admin_password_min_length`. 24 escudos en total. |
 | **1.6.0** | Alertas por correo cuando se crea un Administrador o se promueve una cuenta a ese rol (activadas por defecto). Verificación diaria opcional de la integridad del núcleo de WordPress contra las sumas de control oficiales, con botón "Verificar ahora" y resultado en el panel. Nuevos filtros `essential_hardening_core_integrity_ignore`, `..._core_root` y `..._core_checksums`. 21 escudos en total. `uninstall.php` y la desactivación limpian el cron y el informe nuevos. |
@@ -291,7 +306,7 @@ Notas de comportamiento:
 | Archivo | Contenido |
 |---------|-----------|
 | `essential-hardening.php` | Cabecera del plugin, constantes (`VERSION`, `OPTION_NAME`…), singleton, ajustes por defecto, `init_modules()` (decide qué módulos arrancar) y el arranque. |
-| `includes/trait-support.php` | Utilidades compartidas: IP del cliente, envío seguro de correo, destinatario de alertas y mini-registro de eventos (módulo 17). |
+| `includes/trait-support.php` | Utilidades compartidas: IP del cliente, envío seguro de correo, destinatario de alertas, mini-registro de eventos (módulo 17) y país de las IP (2.25). |
 | `includes/trait-updater.php` | Actualizaciones automáticas desde GitHub (PUC). |
 | `includes/trait-comments.php` | Módulo 1: comentarios y pings. |
 | `includes/trait-privacy.php` | Módulos 2, 4, 5, 11 y 12: anti-enumeración, versión de WordPress, XML-RPC, `<head>` y `body_class`. |

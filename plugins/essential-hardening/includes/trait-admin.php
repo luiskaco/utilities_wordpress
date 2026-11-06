@@ -554,6 +554,34 @@ trait Essential_Hardening_Admin {
 							</div>
 						</div>
 
+						<!-- Bloqueo temporal de la IP que escanea autores -->
+						<div class="eh-item">
+							<input type="checkbox" id="eh_recon_ip_ban" name="<?php echo esc_attr( self::OPTION_NAME ); ?>[recon_ip_ban]" value="1" <?php checked( $options['recon_ip_ban'] ); ?>>
+							<div class="eh-item-body">
+								<div class="eh-item-title-row">
+									<label for="eh_recon_ip_ban" class="eh-item-label"><?php esc_html_e( 'Bloquear Temporalmente la IP que Escanea Autores', 'essential-hardening' ); ?></label>
+									<span class="eh-tag eh-tag-privacy"><?php esc_html_e( 'Opcional', 'essential-hardening' ); ?></span>
+								</div>
+								<p class="eh-item-desc"><?php esc_html_e( 'Si una misma IP hace 5 escaneos ?author= en 10 minutos, recibe un error 403 en todo el sitio durante 1 hora y queda anotado en el registro de eventos. No afecta a usuarios con sesión iniciada ni a IPs locales o privadas. Requiere el escudo «Bloquear Enumeración de Usuarios».', 'essential-hardening' ); ?></p>
+								<p style="margin: 6px 0 0; font-size: 11px; color: #8a4b08;">
+									<?php esc_html_e( '⚠️ Si el sitio está detrás de Cloudflare u otro proxy, configura antes la IP real con el filtro essential_hardening_client_ip. Si no, todos los visitantes comparten la IP del proxy y un escáner podría bloquearlos a todos.', 'essential-hardening' ); ?>
+								</p>
+								<?php
+								// Aviso activo: la petición del panel llegó por un proxy, pero la IP real no está configurada.
+								$behind_proxy = ! empty( $_SERVER['HTTP_CF_CONNECTING_IP'] ) || ! empty( $_SERVER['HTTP_X_FORWARDED_FOR'] ) || ! empty( $_SERVER['HTTP_X_REAL_IP'] );
+								$remote_addr  = isset( $_SERVER['REMOTE_ADDR'] ) ? sanitize_text_field( wp_unslash( $_SERVER['REMOTE_ADDR'] ) ) : '';
+								if ( $behind_proxy && $this->get_client_ip() === $remote_addr ) :
+									?>
+									<div class="notice notice-warning inline" style="margin: 8px 0 0;">
+										<p>
+											<strong><?php esc_html_e( 'Se detectó un proxy o CDN delante del sitio.', 'essential-hardening' ); ?></strong>
+											<?php esc_html_e( 'El plugin está viendo la IP del proxy y no la del visitante: el bloqueo por IP (esta opción, el límite de intentos de login y la recuperación de contraseña) podría afectar a todos los visitantes a la vez. Configura la IP real con el filtro essential_hardening_client_ip.', 'essential-hardening' ); ?>
+										</p>
+									</div>
+								<?php endif; ?>
+							</div>
+						</div>
+
 						<!-- Ocultar Usuario en body_class -->
 						<div class="eh-item">
 							<input type="checkbox" id="eh_hide_author_body_class" name="<?php echo esc_attr( self::OPTION_NAME ); ?>[hide_author_body_class]" value="1" <?php checked( $options['hide_author_body_class'] ); ?>>
@@ -686,6 +714,17 @@ trait Essential_Hardening_Admin {
 								<p class="eh-item-desc"><?php esc_html_e( 'Guarda de forma rotativa y ultraligera los últimos 25 intentos neutralizados (Micro-WAF, fuerza bruta, trampas bot y sondeo de usuarios) para diagnóstico visual sin sobrecargar la base de datos.', 'essential-hardening' ); ?></p>
 							</div>
 						</div>
+
+						<div class="eh-item">
+							<input type="checkbox" id="eh_show_ip_country" name="<?php echo esc_attr( self::OPTION_NAME ); ?>[show_ip_country]" value="1" <?php checked( $options['show_ip_country'] ); ?>>
+							<div class="eh-item-body">
+								<div class="eh-item-title-row">
+									<label for="eh_show_ip_country" class="eh-item-label"><?php esc_html_e( 'Mostrar País y Bandera de Cada IP', 'essential-hardening' ); ?></label>
+									<span class="eh-tag eh-tag-privacy"><?php esc_html_e( 'Opcional', 'essential-hardening' ); ?></span>
+								</div>
+								<p class="eh-item-desc"><?php esc_html_e( 'Añade el país de cada IP del registro y una tabla con las 5 IP más bloqueadas. Privacidad: envía las IP de los atacantes (no las de tus visitantes) al servicio ipwho.is, una sola vez por IP y guardando el resultado 30 días, y tu navegador descarga las banderas de flagcdn.com. Desactivado por defecto porque hace consultas externas.', 'essential-hardening' ); ?></p>
+							</div>
+						</div>
 					</div>
 
 					<!-- Tabla de Eventos Recientes -->
@@ -695,6 +734,40 @@ trait Essential_Hardening_Admin {
 							<p style="margin: 5px 0 0; font-size: 12px; color: #646970;"><?php esc_html_e( 'Cuando el WAF o los escudos de acceso bloqueen un intento sospechoso, aparecerá detallado aquí con fecha, hora e IP.', 'essential-hardening' ); ?></p>
 						</div>
 					<?php else : ?>
+						<?php
+						// País de cada IP (solo si está activado) y las 5 IP con más bloqueos entre los eventos guardados.
+						$event_ips = array();
+						foreach ( $recent_events as $event ) {
+							$event_ips[] = (string) ( $event['ip'] ?? '' );
+						}
+						$ip_countries = $this->get_ip_countries( $event_ips );
+						$ip_hits      = array_count_values( array_filter( $event_ips ) );
+						arsort( $ip_hits );
+						$top_ips = array_slice( $ip_hits, 0, 5, true );
+						?>
+						<?php if ( ! empty( $options['show_ip_country'] ) ) : ?>
+							<h3 style="margin: 0 0 8px; font-size: 14px;"><?php esc_html_e( 'Top 5 de IP bloqueadas (entre los eventos guardados)', 'essential-hardening' ); ?></h3>
+							<div style="overflow-x: auto; border: 1px solid #dcdcde; border-radius: 6px; margin-bottom: 16px;">
+								<table class="wp-list-table widefat striped" style="border: none;">
+									<thead>
+										<tr>
+											<th style="font-weight: 600; font-size: 12px; width: 160px;"><?php esc_html_e( 'Dirección IP', 'essential-hardening' ); ?></th>
+											<th style="font-weight: 600; font-size: 12px;"><?php esc_html_e( 'País', 'essential-hardening' ); ?></th>
+											<th style="font-weight: 600; font-size: 12px; width: 110px;"><?php esc_html_e( 'Bloqueos', 'essential-hardening' ); ?></th>
+										</tr>
+									</thead>
+									<tbody>
+										<?php foreach ( $top_ips as $top_ip => $top_count ) : ?>
+											<tr>
+												<td style="font-size: 12px; font-family: monospace;"><strong><?php echo esc_html( (string) $top_ip ); ?></strong></td>
+												<td style="font-size: 12px;"><?php echo isset( $ip_countries[ $top_ip ] ) ? $this->render_country_label( $ip_countries[ $top_ip ] ) : '&mdash;'; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escapado dentro de render_country_label() ?></td>
+												<td style="font-size: 12px;"><?php echo esc_html( (string) $top_count ); ?></td>
+											</tr>
+										<?php endforeach; ?>
+									</tbody>
+								</table>
+							</div>
+						<?php endif; ?>
 						<div style="overflow-x: auto; border: 1px solid #dcdcde; border-radius: 6px;">
 							<table class="wp-list-table widefat striped" style="border: none;">
 								<thead>
@@ -702,6 +775,9 @@ trait Essential_Hardening_Admin {
 										<th style="font-weight: 600; font-size: 12px; width: 140px;"><?php esc_html_e( 'Fecha / Hora', 'essential-hardening' ); ?></th>
 										<th style="font-weight: 600; font-size: 12px; width: 120px;"><?php esc_html_e( 'Escudo', 'essential-hardening' ); ?></th>
 										<th style="font-weight: 600; font-size: 12px; width: 130px;"><?php esc_html_e( 'Dirección IP', 'essential-hardening' ); ?></th>
+										<?php if ( ! empty( $options['show_ip_country'] ) ) : ?>
+											<th style="font-weight: 600; font-size: 12px; width: 170px;"><?php esc_html_e( 'País', 'essential-hardening' ); ?></th>
+										<?php endif; ?>
 										<th style="font-weight: 600; font-size: 12px;"><?php esc_html_e( 'Detalle del Incidente', 'essential-hardening' ); ?></th>
 									</tr>
 								</thead>
@@ -729,6 +805,11 @@ trait Essential_Hardening_Admin {
 											<td style="font-size: 12px; font-family: monospace;">
 												<strong><?php echo esc_html( $event['ip'] ?? '0.0.0.0' ); ?></strong>
 											</td>
+											<?php if ( ! empty( $options['show_ip_country'] ) ) : ?>
+												<td style="font-size: 12px; white-space: nowrap;">
+													<?php echo isset( $ip_countries[ $event['ip'] ?? '' ] ) ? $this->render_country_label( $ip_countries[ $event['ip'] ] ) : '&mdash;'; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escapado dentro de render_country_label() ?>
+												</td>
+											<?php endif; ?>
 											<td style="font-size: 12px; color: #1d2327;">
 												<code><?php echo esc_html( $event['detail'] ?? '' ); ?></code>
 											</td>

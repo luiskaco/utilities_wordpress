@@ -71,6 +71,105 @@ trait Essential_Hardening_Support {
 		update_option( 'eh_security_events_log', $events, false );
 	}
 
+	/**
+	 * País de cada IP, solo si el usuario activó «Mostrar país de las IP».
+	 *
+	 * Consulta https://ipwho.is (sin clave) y guarda el resultado 30 días por IP, así que cada IP se
+	 * consulta una sola vez. Para no volver lenta la pantalla, hace como mucho 6 consultas nuevas por
+	 * carga: las IP que falten se completan al recargar. Las IP locales o reservadas no se consultan.
+	 *
+	 * @param string[] $ips IP a resolver.
+	 * @return array<string, array{code: string, name: string}> IP => país. Las que no se pudieron resolver no aparecen.
+	 */
+	private function get_ip_countries( array $ips ): array {
+		if ( empty( $this->options['show_ip_country'] ) ) {
+			return array();
+		}
+
+		$result      = array();
+		$lookups_left = 6;
+
+		foreach ( array_unique( $ips ) as $ip ) {
+			if ( ! $this->is_ip_bannable( (string) $ip ) ) {
+				continue;
+			}
+
+			/**
+			 * Permite resolver el país sin consulta externa (base de datos GeoIP propia, cabecera de la CDN o pruebas).
+			 *
+			 * @param array|null $country array( 'code' => 'ES', 'name' => 'España' ) o null para usar el servicio por defecto.
+			 * @param string     $ip      IP a resolver.
+			 */
+			$country = apply_filters( 'essential_hardening_ip_country', null, $ip );
+
+			if ( null === $country ) {
+				$cache_key = 'eh_geo_' . md5( $ip );
+				$cached    = get_transient( $cache_key );
+
+				if ( false !== $cached ) {
+					$country = is_array( $cached ) ? $cached : null;
+				} elseif ( $lookups_left > 0 ) {
+					--$lookups_left;
+					$country = $this->lookup_ip_country( $ip );
+					// Un fallo se recuerda solo 1 hora; un acierto, 30 días.
+					set_transient( $cache_key, null === $country ? 'none' : $country, null === $country ? HOUR_IN_SECONDS : 30 * DAY_IN_SECONDS );
+				}
+			}
+
+			if ( is_array( $country ) && ! empty( $country['code'] ) && preg_match( '/^[A-Z]{2}$/', (string) $country['code'] ) ) {
+				$result[ $ip ] = array(
+					'code' => (string) $country['code'],
+					'name' => isset( $country['name'] ) ? (string) $country['name'] : (string) $country['code'],
+				);
+			}
+		}
+
+		return $result;
+	}
+
+	/**
+	 * Consulta el país de una IP pública. Devuelve null si el servicio no responde o no la conoce.
+	 *
+	 * @return array{code: string, name: string}|null
+	 */
+	private function lookup_ip_country( string $ip ): ?array {
+		$response = wp_remote_get(
+			'https://ipwho.is/' . rawurlencode( $ip ) . '?fields=success,country,country_code',
+			array(
+				'timeout'    => 3,
+				'user-agent' => 'EssentialHardening/' . self::VERSION,
+			)
+		);
+
+		if ( is_wp_error( $response ) || 200 !== (int) wp_remote_retrieve_response_code( $response ) ) {
+			return null;
+		}
+
+		$data = json_decode( (string) wp_remote_retrieve_body( $response ), true );
+		if ( ! is_array( $data ) || empty( $data['success'] ) || empty( $data['country_code'] ) || ! preg_match( '/^[A-Za-z]{2}$/', (string) $data['country_code'] ) ) {
+			return null;
+		}
+
+		return array(
+			'code' => strtoupper( (string) $data['country_code'] ),
+			'name' => isset( $data['country'] ) ? sanitize_text_field( (string) $data['country'] ) : strtoupper( (string) $data['country_code'] ),
+		);
+	}
+
+	/**
+	 * HTML de la bandera y el nombre del país (la imagen la carga el navegador desde flagcdn.com).
+	 */
+	private function render_country_label( array $country ): string {
+		$code = strtolower( $country['code'] );
+		return sprintf(
+			'<img src="%1$s" srcset="%2$s 2x" width="20" height="15" alt="%3$s" loading="lazy" referrerpolicy="no-referrer" style="vertical-align: -2px; margin-right: 6px; border: 1px solid #dcdcde;"> %4$s',
+			esc_url( 'https://flagcdn.com/w20/' . $code . '.png' ),
+			esc_url( 'https://flagcdn.com/w40/' . $code . '.png' ),
+			esc_attr( $country['code'] ),
+			esc_html( $country['name'] )
+		);
+	}
+
 	public function handle_clear_security_log(): void {
 		if ( ! current_user_can( 'manage_options' ) ) {
 			wp_die( esc_html__( 'Acceso no autorizado.', 'essential-hardening' ) );
